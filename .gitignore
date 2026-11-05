@@ -1,0 +1,7 @@
+# Local compiled outputs; original binaries remain on disk.
+/main
+/main.alt
+/mainruanshiwei
+*.o
+/build/
+.DS_Store

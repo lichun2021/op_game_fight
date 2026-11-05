@@ -1,0 +1,8 @@
+-- 104 物理暴击率提升
+local rethelper = {}
+
+rethelper.check_do = function(character, param)
+    return aieffectcaster.check_exert_special_effect(character, 104, param)
+end
+
+return rethelper

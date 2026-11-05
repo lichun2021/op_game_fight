@@ -1,0 +1,4 @@
+-- 58 随机一个已死亡的友军/敌军
+return function( params )
+    return g_targethelper.get_randomdeadcharacter(g_targethelper.pick_filteredalllist(params))
+end

@@ -1,0 +1,1678 @@
+#include "server.h"
+#include <sstream>
+#include <unistd.h>
+#include <stdlib.h>
+#include "stdarg.h"
+#include <string.h>
+#include <assert.h>
+#include "AI/CommonType.h"
+#include "AI/AIContext.h"
+#include "AI/AICallback.h"
+#include "AI/AIDataManager.h"
+#include "jsonx/reader.h"
+class AIContext;
+int win;
+extern int Dir_index;
+int serializIndex=0;
+uint64_t totaltime;
+unsigned int totalcount;
+unsigned int maxtime=0;
+uint64_t ntohl64(uint64_t arg64)
+{
+	uint64_t res64;
+#ifdef __BYTE_ORDER
+	#if __BYTE_ORDER==__LITTLE_ENDIAN
+		uint32_t low = (uint32_t) (arg64 & 0x00000000FFFFFFFFLL);
+		uint32_t high = (uint32_t) ((arg64 & 0xFFFFFFFF00000000LL) >> 32);
+		low = ntohl(low);
+		high = ntohl(high);
+		res64 = (uint64_t) high + (((uint64_t) low) << 32);
+	#else
+		res64 = arg64;
+	#endif
+#endif
+	return res64;
+} 
+
+
+uint64_t htonl64(uint64_t arg64)
+{
+	uint64_t res64;
+#ifdef __BYTE_ORDER
+	#if __BYTE_ORDER==__LITTLE_ENDIAN
+		uint32_t low = (uint32_t) (arg64 & 0x00000000FFFFFFFFLL);
+		uint32_t high = (uint32_t) ((arg64 & 0xFFFFFFFF00000000LL) >> 32);
+		//cout<<"htonl64:"<<arg64<<" low:"<<low<<" high:"<<high<<endl;
+		low = htonl(low);
+		high = htonl(high);
+		res64 = (uint64_t) high + (((uint64_t) low) << 32);
+	#else
+		res64 = arg64;
+	#endif
+#endif
+	return res64;
+}
+
+void addCannon(){
+	int type = 1;
+	int clusterNum = 0;
+	int * attList = new int [34] { 10001, 0, 31, 0, 0, 0, 19181, 9804, 5371, 9401, 5402, 0, 0, 15, 456, 254, 99, 58, 200, 200, 184, 144, 348, 177, 0, 0, 3, 3, 0, 0, 0, 0, 30, 200 };
+	std::list<std::pair<int, int> > skilllist;
+	OnePiece::AIContext::getInstance()->addHeroCharacters(attList, skilllist, 0, type, 100, 1, clusterNum);
+	OnePiece::CharacterData * cannon = OnePiece::AIContext::getInstance()->getCharacterByID(0);
+	cannon->currentAction = OnePiece::DEAD_ACTION1;
+};
+
+std::vector< OnePiece::RewardCandidateItem*>* RewardCandidateItemFromGkid(int gkid,int cluster, int id){
+	if (cluster == 0){
+		if (gkid == 0) {
+			std::vector< OnePiece::RewardCandidateItem*>* rewardVec = new std::vector< OnePiece::RewardCandidateItem*>();
+			return rewardVec;
+		}
+		rapidjson::Document* doc = OnePiece::AIDataManager::getJsonFromFile("_pve_guanqia_hash");
+		if (!doc)
+			return nullptr;
+		std::string gk = OnePiece::stringWithFormat("%d", gkid);
+		rapidjson::Value& json_object = doc->operator[](gk.c_str())["reward"];
+		std::vector< OnePiece::RewardCandidateItem*>* rewardVec = new std::vector< OnePiece::RewardCandidateItem*>();
+
+		if (json_object.IsArray()){
+			int a = json_object.Size();
+			for (int i = 0; i < json_object.Size(); ++i){
+
+				OnePiece::RewardCandidateItem* rewardItem = nullptr;
+				rapidjson::Value& value = json_object[i];
+
+				rapidjson::Value& i_value = value["i"];
+				if (i_value.IsArray()){
+					rewardItem = new OnePiece::RewardCandidateItem();
+					for (int j = 0; j < i_value.Size(); ++j){
+						rapidjson::Value& j_value = i_value[j];
+						OnePiece::IARitem *iaritem = new OnePiece::IARitem(j_value["i"].GetInt(), j_value["a"].GetInt(), j_value["r"].GetInt());
+						rewardItem->iarlist.push_back(iaritem);
+					}
+				}
+
+				///icon
+				rapidjson::Value& icon_value = value["icon"];
+				if (icon_value.IsArray()){
+					for (int ic = 0; ic < icon_value.Size(); ++ic){
+						rewardItem->icon.push_back(icon_value[ic].GetInt());
+					}
+				}
+
+				rewardItem->a = value["a"].GetInt(); ///a 
+				rewardItem->r = value["r"].GetInt(); ///r
+				rewardItem->t = value["t"].GetInt();///t
+
+				rewardVec->push_back(rewardItem);
+			}
+		}
+		return rewardVec;
+	} else {
+		if (gkid == 0) {
+			std::vector< OnePiece::RewardCandidateItem*>* rewardVec = new std::vector< OnePiece::RewardCandidateItem*>();
+			return rewardVec;
+		}
+		rapidjson::Document* doc = OnePiece::AIDataManager::getJsonFromFile("_pve_guanqia_character_reward");
+		if (!doc)
+			return nullptr;
+		//, "10512":{"1":{"1":{"reward":[{"i":[{"i":90003, "a" : 1, "r" : 100}], "a" : 50, "r" : 100, "icon" : [70001], "q" : 4, "n" : "金币", "d" : "金币", "t" : 100}, { "i":[{"i":109008, "a" : 1, "r" : 100}], "a" : 1, "r" : 10, "icon" : [59003], "q" : 4, "n" : "木之皮革碎片", "d" : "木之皮革碎片", "t" : 100 }, { "i":[{"i":108409, "a" : 1, "r" : 100}], "a" : 1, "r" : 10, "icon" : [58003], "q" : 4, "n" : "木之彩珠碎片", "d" : "木之彩珠碎片", "t" : 100 }, { "i":[], "a" : 0, "r" : 0, "t" : 0 }, { "i":[], "a" : 0, "r" : 0, "t" : 0 }], "hit_reward" : [{"i":0, "a" : 0, "r" : 0}, { "i":0, "a" : 0, "r" : 0 }, { "i":0, "a" : 0, "r" : 0 }]}, "2" : {"reward":[{"i":[{"i":90003, "a" : 1, "r" : 100}], "a" : 50, "r" : 100, "icon" : [70001], "q" : 4, "n" : "金币", "d" : "金币", "t" : 100}, { "i":[], "a" : 0, "r" : 0, "t" : 0 }, { "i":[], "a" : 0, "r" : 0, "t" : 0 }, { "i":[], "a" : 0, "r" : 0, "t" : 0 }, { "i":[], "a" : 0, "r" : 0, "t" : 0 }], "hit_reward" : [{"i":0, "a" : 0, "r" : 0}, { "i":0, "a" : 0, "r" : 0 }, { "i":0, "a" : 0, "r" : 0 }]}, "3" : {"reward":[{"i":[{"i":90003, "a" : 1, "r" : 100}], "a" : 50, "r" : 100, "icon" : [70001], "q" : 4, "n" : "金币", "d" : "金币", "t" : 100}, { "i":[], "a" : 0, "r" : 0, "t" : 0 }, { "i":[], "a" : 0, "r" : 0, "t" : 0 }, {
+		std::string gk = OnePiece::stringWithFormat("%d", gkid);
+		std::string cl = OnePiece::stringWithFormat("%d", cluster);
+		std::string i = OnePiece::stringWithFormat("%d", id+1);
+		cout<<"=====gkid:"<<gk<<":"<<cl<<":"<<i<<endl;
+
+		rapidjson::Value& j1 = doc->operator[](gk.c_str())[cl.c_str()];
+		if(j1.IsNull()) return nullptr;
+		if(j1[i.c_str()].IsNull()) return nullptr;
+
+		rapidjson::Value& json_object = doc->operator[](gk.c_str())[cl.c_str()][i.c_str()]["reward"];
+		std::vector< OnePiece::RewardCandidateItem*>* rewardVec = new std::vector< OnePiece::RewardCandidateItem*>();
+	
+		if (json_object.IsArray()){
+			int a = json_object.Size();
+			for (int i = 0; i < json_object.Size(); ++i){
+	
+				OnePiece::RewardCandidateItem* rewardItem = nullptr;
+				rapidjson::Value& value = json_object[i];
+	
+				rapidjson::Value& i_value = value["i"];
+				if (i_value.IsArray()){
+					rewardItem = new OnePiece::RewardCandidateItem();
+					for (int j = 0; j < i_value.Size(); ++j){
+						rapidjson::Value& j_value = i_value[j];
+						OnePiece::IARitem *iaritem = new OnePiece::IARitem(j_value["i"].GetInt(), j_value["a"].GetInt(), j_value["r"].GetInt());
+						rewardItem->iarlist.push_back(iaritem);
+					}
+				}
+	
+				///icon 
+				rapidjson::Value& icon_value = value["icon"];
+				if (icon_value.IsArray()){
+					for (int ic = 0; ic < icon_value.Size(); ++ic){
+						rewardItem->icon.push_back(icon_value[ic].GetInt());
+					}
+				}
+	
+				rewardItem->a = value["a"].GetInt(); ///a 
+				rewardItem->r = value["r"].GetInt(); ///r
+				rewardItem->t = value["t"].GetInt();///t
+	
+				rewardVec->push_back(rewardItem);
+			}
+		}
+		return rewardVec;
+	}
+}
+
+class  AICallbackServer : public OnePiece::AICallback
+{
+public:
+	int ongoing;
+	std::map<int, int>* rewardVec = new std::map<int, int>();
+	void operationTrack(int* trackCannon, std::vector<std::pair<int, int>>& trackUltra, int* trackSetDistance, std::vector<std::pair<int, int>>& trackAutofight){ 
+		ongoing = 0; 
+		OnePiece::AIContext::getInstance()->printAIContext();
+		printf("%s\n", "complete!");
+	};
+	AICallbackServer(){ ongoing = 1; win = 1;};
+	~AICallbackServer(){ delete rewardVec; printf("%s\n", "delete callback"); }
+	//hook to interval update
+	void startSchedule(int value, int x, int y, int z){};
+	void startSchedule(){};
+	void resumeSchedule(){;};
+	void stopSchedule(int value, int x, int y, int z){};
+	void stopSchedule(){};
+	//set playSpeed
+	void playSpeed(int multiple){;};
+	//notify fighting result, return win=1 or lose=2
+	void fightingComplete(int fightRes, std::vector<std::pair<int, int> >* rewardArray){ 
+		if (fightRes != 1) {
+			win = fightRes; 
+			//printf("fightRes%dwin%d\n", fightRes,win); 
+		} 
+		if (rewardArray != nullptr) {
+			for (std::vector<std::pair<int, int>>::iterator iter = rewardArray->begin(); iter != rewardArray->end(); iter++) {
+				std::map<int, int>::iterator it = rewardVec->find(iter->first);
+				if (it == rewardVec->end()) {
+					rewardVec->insert(*iter);
+				}
+				else {
+					it->second += iter->second;
+				}
+			}
+		}
+		// if ((fightRes != 1)  || cluster == OnePiece::AIContext::getInstance()->rival_clusters.size()){
+		// 	win = (fightRes==1)?1:2; 
+		// 	printf("fightRes%d\n", fightRes); 
+		// 	reward = rewardArray; printf("complete!\n");
+		// 	ongoing = 0;
+		// } else {
+
+		// }
+
+	};
+	void monsterDeadReward(int monsterID, int x, int y, int z, std::vector<std::pair<int, int> >* rewardArray){
+		if (rewardArray != nullptr) {
+			for (std::vector<std::pair<int, int>>::iterator iter = rewardArray->begin(); iter != rewardArray->end();iter++) {
+				std::map<int, int>::iterator it = rewardVec->find(iter->first);
+				if (it == rewardVec->end()) {
+					rewardVec->insert(*iter);
+				}
+				else {
+					it->second += iter->second;
+				}
+			}
+		}
+	};
+	//to remove some characters
+	void removeCharacters(int *idlist){;};
+	void fixCamera(int x, int y, int z){;};
+};
+
+std::pair<int, std::map<int, int>* > fight (const string& str) {	
+	try
+	{
+		win = 0;
+		char buff[20];
+		Json::Reader reader;
+    	Json::Value root;
+    	reader.parse(str, root);
+		int seed = root["seed"].asInt();
+		//printf(str);
+		printf("seed: %d\n", seed);
+		int k = root["k"].asInt();
+		int bkey = root["bkey"].asInt();
+		printf("k: %d\n", k);
+		printf("%d\n", root["teams"].size());
+		for (std::map<unsigned short, OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->allCharacters.begin(); iter != OnePiece::AIContext::getInstance()->allCharacters.end(); iter++)
+		{
+			delete (iter)->second;
+		}
+		OnePiece::AIContext::getInstance()->clear();
+		addCannon();
+		int clusterNum = root["teams"].size()-1;
+		int gkid = root["gkid"].asInt();
+		for (int cluster = 0; cluster<=clusterNum;cluster++){
+			for (int i = 0; i < root["teams"][cluster].size(); i++) {
+				//x,y,z
+				int *attrList = new int[root["teams"][cluster][i]["attr"].size()];
+				for (int j = 0; j < root["teams"][cluster][i]["attr"].size(); j++){
+					attrList[j] = root["teams"][cluster][i]["attr"][j].asInt();
+				}
+				if (attrList[11] <= 0) continue;
+				std::list<std::pair<int, int> > skillList;
+				for (int j = 0; j < root["teams"][cluster][i]["j"].size(); j++){
+					skillList.push_back(std::pair<int, int>());
+					int x = root["teams"][cluster][i]["j"][j]["i"].asInt();
+					int y = root["teams"][cluster][i]["j"][j]["lv"].asInt();
+					skillList.back().first = root["teams"][cluster][i]["j"][j]["i"].asInt();
+         			skillList.back().second = root["teams"][cluster][i]["j"][j]["lv"].asInt();
+				}
+				int juexing = root["teams"][cluster][i]["x"].asInt();
+				int type = 1;
+				short Ultralock = (bkey>10)?0:1;
+				int id = OnePiece::AIContext::getInstance()->addHeroCharacters(attrList, skillList, juexing, type, (k==cluster)?1:0, (cluster==0)?1:Ultralock, cluster);
+
+				OnePiece::CharacterData* chara = OnePiece::AIContext::getInstance()->getCharacterByID(id);
+				if (root["teams"][cluster][i]["bqsl"].isArray()) {
+					for (int j = 0; j < root["teams"][cluster][i]["bqsl"].size(); j++){
+						for (int l=0;l< root["teams"][cluster][i]["bqsl"][j].size(); l++){
+							int bqi = root["teams"][cluster][i]["bqsl"][j][l]["i"].asInt();
+							int bqlv = root["teams"][cluster][i]["bqsl"][j][l]["lv"].asInt();
+							chara -> addTalent(bqi, bqlv);
+						}
+					}
+				}
+
+				int monsterId = root["teams"][cluster][i]["i"].asInt();
+				if (cluster > 0 && gkid > 0){
+					cout<<"==gkid:"<<gkid<<":"<<cluster<<":"<<monsterId<<endl;
+					std::vector<OnePiece::RewardCandidateItem*>* monster_reward = RewardCandidateItemFromGkid(gkid, cluster, monsterId);
+					if (monster_reward != nullptr) {
+						printf("%d,%d,%d\n",cluster,id, monster_reward->size());
+						sprintf(buff, "%d-%d", cluster, id);
+						OnePiece::AIContext::getInstance()->setRewardCandidate(monster_reward, buff, cluster);
+					}
+				}
+
+			}
+		}
+		if (gkid > 0){
+			std::vector<OnePiece::RewardCandidateItem*>* gkreward = RewardCandidateItemFromGkid(gkid, 0,0);
+			if (gkreward != nullptr) {
+				sprintf(buff, "%d", 1);
+				OnePiece::AIContext::getInstance()->setRewardCandidate(gkreward, buff, 1);
+			}
+		} else {
+			OnePiece::AIContext::getInstance()->setAutoFight(true);
+		}
+
+		OnePiece::AIContext::getInstance()->setBusinessType(bkey);
+		OnePiece::AIContext::getInstance()->setGuanqiaID(gkid>0?gkid:-1);
+		OnePiece::AIContext::getInstance()->setSeed(seed,1);
+		AICallbackServer *callback = new AICallbackServer;
+		OnePiece::AIContext::getInstance()->setCallback(*callback);
+		float * t1 = new float[1];
+		float *t2 = new float[1];
+		float *t3 = new float[1];
+		t1[0]=90;
+		t2[0] = 90;
+		t3[0] = 90;
+		OnePiece::AIContext::getInstance()->setWinLoseCheck(t1,1);
+		OnePiece::AIContext::getInstance()->setWinLoseCheck(t2, 2);
+		OnePiece::AIContext::getInstance()->setWinLoseCheck(t3,3);
+
+		int delta_min_y  = root["battleRect"]["y"].asDouble();
+        int delta_max_y  = root["battleRect"]["y"].asDouble()+  root["battleRect"]["height"].asDouble();
+	
+		std::cout<< "minY"<<delta_min_y<<"maxY"<<delta_max_y<<endl;	
+
+		OnePiece::AIContext::getInstance()->setDeltaY(delta_min_y,delta_max_y);
+
+		int * trackCannon = nullptr;
+		if (root["operation"]["cannon"].size() > 0){
+			trackCannon = new int[root["operation"]["cannon"].size()];
+			for (int i = 0; i < root["operation"]["cannon"].size(); i++){
+				trackCannon[i] = root["operation"]["cannon"][i].asInt();
+			}
+		}
+
+		std::map<std::string, int> *input_trackUltra = nullptr;
+		if (root["operation"]["trackUltra"].size() > 0){
+			input_trackUltra = new std::map<std::string, int>();
+			for (int i = 0; i < root["operation"]["trackUltra"].size(); i += 2) {
+				int tick = root["operation"]["trackUltra"][i].asInt();
+				int id = root["operation"]["trackUltra"][i + 1].asInt();
+				sprintf(buff, "%d-%d", tick, id);
+				input_trackUltra->insert(std::pair<std::string, int>(buff, id));
+			}
+		}
+		int * input_trackSetDistance = nullptr;
+		if (root["operation"]["distance"].size() > 0){
+			input_trackSetDistance = new int[root["operation"]["distance"].size()];
+			for (int i = 0; i < root["operation"]["distance"].size(); i++){
+				input_trackSetDistance[i] = root["operation"]["distance"][i].asInt();
+			}
+		}
+		
+		std::map<int, int> *input_trackAutofigh = nullptr; 
+		if (root["operation"]["autofight"].size() > 0) {
+			input_trackAutofigh = new std::map<int, int>();
+			for (int i = 0; i < root["operation"]["autofight"].size(); i += 2) {
+				int tick = root["operation"]["autofight"][i].asInt();
+				int id = root["operation"]["autofight"][i + 1].asInt();
+				input_trackAutofigh->insert(std::pair<int, int>(tick, id));
+			}
+		}
+		OnePiece::AIContext::getInstance()->setOPInput(trackCannon,input_trackUltra,input_trackSetDistance,input_trackAutofigh);
+		// for ()
+		// OnePiece::AIContext::getInstance()->setOPInput(int* trackCannon, std::map<std::string, int>* input_trackUltra, int* input_trackSetDistance, std::map<int, int>* input_trackAutofigh);		
+		OnePiece::AIContext::getInstance()->toNextCluster((int)root["operation"]["distance"][0u].asInt());
+		do{	
+			OnePiece::AIContext::getInstance()->updateAIContext(0.05);
+		}
+		while(callback->ongoing==1);
+
+		return std::pair<int, std::map<int, int>* >(win, callback->rewardVec);
+	}
+	catch (readException& e)
+	{
+		return std::pair<int, std::map<int, int>* >(0, nullptr);
+	}
+};
+
+std::pair<int, std::map<int, int>* > fightDouji (const string& str, const int seq, std::map<int, int>* HPMAP) {	
+	try
+	{
+		win = 0;
+		char buff[20];
+		Json::Reader reader;
+    	Json::Value root;
+    	reader.parse(str, root);
+		int seed = root[seq]["seed"].asInt();
+		//printf(str);
+		printf("seed: %d\n", seed);
+		int k = root[seq]["k"].asInt();
+		int bkey = root[seq]["bkey"].asInt();
+		printf("k: %d\n", k);
+		printf("%d\n", root[seq]["teams"].size());
+		for (std::map<unsigned short, OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->allCharacters.begin(); iter != OnePiece::AIContext::getInstance()->allCharacters.end(); iter++)
+		{
+			delete (iter)->second;
+		}
+		OnePiece::AIContext::getInstance()->clear();
+		addCannon();
+		int clusterNum = root[seq]["teams"].size()-1;
+		int gkid = root[seq]["gkid"].asInt();
+		for (int cluster = 0; cluster<=clusterNum;cluster++){
+			for (int i = 0; i < root[seq]["teams"][cluster].size(); i++) {
+				//x,y,z
+				int *attrList = new int[root[seq]["teams"][cluster][i]["attr"].size()];
+				for (int j = 0; j < root[seq]["teams"][cluster][i]["attr"].size(); j++){
+					attrList[j] = root[seq]["teams"][cluster][i]["attr"][j].asInt();
+				}
+
+				if (HPMAP != nullptr) {
+					std::map<int, int>::iterator it = HPMAP->find(attrList[0]);
+					if (it != HPMAP->end()) {
+						attrList[11] = it->second;
+					}
+				} 
+				if (attrList[11] <= 0) continue;
+				std::list<std::pair<int, int> > skillList;
+				for (int j = 0; j < root[seq]["teams"][cluster][i]["j"].size(); j++){
+					skillList.push_back(std::pair<int, int>());
+					int x = root[seq]["teams"][cluster][i]["j"][j]["i"].asInt();
+					int y = root[seq]["teams"][cluster][i]["j"][j]["lv"].asInt();
+					skillList.back().first = root[seq]["teams"][cluster][i]["j"][j]["i"].asInt();
+         			skillList.back().second = root[seq]["teams"][cluster][i]["j"][j]["lv"].asInt();
+				}
+				int juexing = root[seq]["teams"][cluster][i]["x"].asInt();
+				int type = 1;
+				short Ultralock = (bkey>10)?0:1;
+				int id = OnePiece::AIContext::getInstance()->addHeroCharacters(attrList, skillList, juexing, type, (k==cluster)?1:0, (cluster==0)?1:Ultralock, cluster);
+
+				OnePiece::CharacterData* chara = OnePiece::AIContext::getInstance()->getCharacterByID(id);
+				if (root[seq]["teams"][cluster][i]["bqsl"].isArray()) {
+					for (int j = 0; j < root[seq]["teams"][cluster][i]["bqsl"].size(); j++){
+						for (int l=0;l< root[seq]["teams"][cluster][i]["bqsl"][j].size(); l++){
+							int bqi = root[seq]["teams"][cluster][i]["bqsl"][j][l]["i"].asInt();
+							int bqlv = root[seq]["teams"][cluster][i]["bqsl"][j][l]["lv"].asInt();
+							chara -> addTalent(bqi, bqlv);
+						}
+					}
+				}
+
+				int monsterId = root[seq]["teams"][cluster][i]["i"].asInt();
+				if (cluster > 0 && gkid > 0){
+					std::vector<OnePiece::RewardCandidateItem*>* monster_reward = RewardCandidateItemFromGkid(gkid, cluster, monsterId);
+					printf("%d,%d,%d\n",cluster,id, monster_reward->size());
+					if (monster_reward != nullptr) {
+						sprintf(buff, "%d-%d", cluster, id);
+						OnePiece::AIContext::getInstance()->setRewardCandidate(monster_reward, buff, cluster);
+					}
+				}
+
+			}
+		}
+		if (gkid > 0){
+			std::vector<OnePiece::RewardCandidateItem*>* gkreward = RewardCandidateItemFromGkid(gkid, 0,0);
+			if (gkreward != nullptr) {
+				sprintf(buff, "%d", 1);
+				OnePiece::AIContext::getInstance()->setRewardCandidate(gkreward, buff, 1);
+			}
+		} else {
+			OnePiece::AIContext::getInstance()->setAutoFight(true);
+		}
+
+		OnePiece::AIContext::getInstance()->setBusinessType(bkey);
+		OnePiece::AIContext::getInstance()->setGuanqiaID(gkid>0?gkid:-1);
+		OnePiece::AIContext::getInstance()->setSeed(seed,1);
+		AICallbackServer *callback = new AICallbackServer;
+		OnePiece::AIContext::getInstance()->setCallback(*callback);
+		float * t1 = new float[1];
+		float *t2 = new float[1];
+		float *t3 = new float[1];
+		t1[0]=90;
+		t2[0] = 90;
+		t3[0] = 90;
+		OnePiece::AIContext::getInstance()->setWinLoseCheck(t1,1);
+		OnePiece::AIContext::getInstance()->setWinLoseCheck(t2, 2);
+		OnePiece::AIContext::getInstance()->setWinLoseCheck(t3,3);
+
+		int delta_min_y  = root[seq]["battleRect"]["y"].asDouble();
+        int delta_max_y  = root[seq]["battleRect"]["y"].asDouble()+  root[seq]["battleRect"]["height"].asDouble();
+	
+		std::cout<< "minY"<<delta_min_y<<"maxY"<<delta_max_y<<endl;	
+
+		OnePiece::AIContext::getInstance()->setDeltaY(delta_min_y,delta_max_y);
+
+		int * trackCannon = nullptr;
+		if (root[seq]["operation"]["cannon"].size() > 0){
+			trackCannon = new int[root[seq]["operation"]["cannon"].size()];
+			for (int i = 0; i < root[seq]["operation"]["cannon"].size(); i++){
+				trackCannon[i] = root[seq]["operation"]["cannon"][i].asInt();
+			}
+		}
+
+		std::map<std::string, int> *input_trackUltra = nullptr;
+		if (root[seq]["operation"]["trackUltra"].size() > 0){
+			input_trackUltra = new std::map<std::string, int>();
+			for (int i = 0; i < root[seq]["operation"]["trackUltra"].size(); i += 2) {
+				int tick = root[seq]["operation"]["trackUltra"][i].asInt();
+				int id = root[seq]["operation"]["trackUltra"][i + 1].asInt();
+				sprintf(buff, "%d-%d", tick, id);
+				input_trackUltra->insert(std::pair<std::string, int>(buff, id));
+			}
+		}
+		int * input_trackSetDistance = nullptr;
+		if (root[seq]["operation"]["distance"].size() > 0){
+			input_trackSetDistance = new int[root[seq]["operation"]["distance"].size()];
+			for (int i = 0; i < root[seq]["operation"]["distance"].size(); i++){
+				input_trackSetDistance[i] = root[seq]["operation"]["distance"][i].asInt();
+			}
+		}
+		
+		std::map<int, int> *input_trackAutofigh = nullptr; 
+		if (root[seq]["operation"]["autofight"].size() > 0) {
+			input_trackAutofigh = new std::map<int, int>();
+			for (int i = 0; i < root[seq]["operation"]["autofight"].size(); i += 2) {
+				int tick = root[seq]["operation"]["autofight"][i].asInt();
+				int id = root[seq]["operation"]["autofight"][i + 1].asInt();
+				input_trackAutofigh->insert(std::pair<int, int>(tick, id));
+			}
+		}
+		OnePiece::AIContext::getInstance()->setOPInput(trackCannon,input_trackUltra,input_trackSetDistance,input_trackAutofigh);
+		// for ()
+		// OnePiece::AIContext::getInstance()->setOPInput(int* trackCannon, std::map<std::string, int>* input_trackUltra, int* input_trackSetDistance, std::map<int, int>* input_trackAutofigh);		
+		OnePiece::AIContext::getInstance()->toNextCluster((int)root[seq]["operation"]["distance"][0u].asInt());
+		do{	
+			OnePiece::AIContext::getInstance()->updateAIContext(0.05);
+		}
+		while(callback->ongoing==1);
+
+		return std::pair<int, std::map<int, int>* >(win, callback->rewardVec);
+	}
+	catch (readException& e)
+	{
+		return std::pair<int, std::map<int, int>* >(0, nullptr);
+	}
+};
+msg_pkg::msg_pkg()
+{
+	buf=NULL;
+	len=0;
+	used=0;
+}
+
+msg_pkg::msg_pkg(char *src,int size)
+{
+	used=0;
+	if(src !=NULL && size>0 && size<=BUFF_MAXSIZE)
+	{
+		len=size;
+		this->buf=src;
+	}
+	else
+	{
+		len=0;
+		this->buf=NULL;
+	}
+}
+
+msg_pkg::msg_pkg(const msg_pkg& other)
+{
+	buf=other.buf;
+	len=other.len;
+	used=other.used;
+}
+
+msg_pkg &msg_pkg::operator =(const msg_pkg &other)
+{
+	buf=other.buf;
+	len=other.len;
+	used=other.used;
+}
+
+unsigned int msg_pkg::read_uint32()
+{
+	int leftlen=len-used;
+	if(leftlen<4)
+	{
+		throw readException();
+	}
+	unsigned int value=*((unsigned int *)(buf+used));
+	//cout<<"read_uint32:"<<value<<endl;
+	value=ntohl(value);
+	//cout<<"read_uint32:"<<value<<":"<<used<<endl;
+	used+=4;
+	return value;
+}
+
+uint64_t msg_pkg::read_uint64()
+{
+	int leftlen=len-used;
+	if(leftlen<8)
+	{
+		throw readException();
+	}
+	uint64_t value=*((uint64_t *)(buf+used));
+	//cout<<"read_uint64:"<<value<<endl;
+	value=ntohl64(value);
+	//cout<<"read_uint64:"<<value<<":"<<used<<endl;
+	used+=8;
+	return value;
+}
+
+unsigned char msg_pkg::read_uint8()
+{
+	int leftlen=len-used;
+	if(leftlen<1)
+	{
+		throw readException();
+	}
+	unsigned char value=*((unsigned char *)(buf+used));
+	//cout<<"read_uint8:"<<int(value)<<endl;
+	//cout<<"read_uint8:"<<int(value)<<":"<<used<<endl;
+	used+=1;
+	return value;
+}
+
+char* msg_pkg::read_string(unsigned int size)
+{
+	int leftlen=len-used;
+	if(leftlen<size)
+	{
+		throw readException();
+	}
+	//cout<<"read_string:"<<size<<endl;
+	char *ptr=buf+used;
+	//cout<<"read_string:"<<used<<endl;
+	used+=size;
+	return ptr;
+}
+
+unsigned int msg_pkg::size()
+{
+	return len;
+}
+
+unsigned int msg_pkg::offset()
+{
+	return used;
+}
+
+int msg_pkg::write_uint32(unsigned int data)
+{
+	int leftlen=len-used;
+	if(leftlen<4)
+	{
+		throw writeException();
+	}
+	unsigned int temp=htonl(data);
+	memcpy((void *)(this->buf+this->used),(void *)(&temp),4);
+	used+=4;
+	return used;
+}
+
+int msg_pkg::write_uint64(uint64_t data)
+{
+	int leftlen=len-used;
+	if(leftlen<8)
+	{
+		throw writeException();
+	}
+	uint64_t temp=htonl64(data);
+	memcpy((void *)(this->buf+this->used),(void *)(&temp),8);
+	used+=8;
+	return used;
+}
+
+int msg_pkg::write_uint8(unsigned char data)
+{
+	int leftlen=len-used;
+	if(leftlen<1)
+	{
+		throw writeException();
+	}
+	memcpy((void *)(this->buf+this->used),(void *)(&data),1);
+	used+=1;
+	return used;
+}
+
+int msg_pkg::write_string(char *data,unsigned int size)
+{
+	int leftlen=len-used;
+	if(leftlen<size)
+	{
+		throw writeException();
+	}
+	memcpy((void *)(this->buf+this->used),(void *)(data),size);
+	used+=size;
+	return used;
+}
+
+int msg_pkg::seek(int offset)
+{
+	if(offset>this->len)
+	{
+		offset=this->len;
+	}
+	if(offset<0)
+		offset=0;
+	used=offset;
+	return used;
+}
+
+bool msg_pkg::rebind(char *buff,int size)
+{
+	if(buff !=NULL && size>0 && size<=BUFF_MAXSIZE)
+	{
+		len=size;
+		this->buf=buff;
+		used=0;
+		return true;
+	}
+	return false;
+}
+
+socketbuff::socketbuff():
+out_msg()
+{
+	memset((void *)in_buf,0,2*BUFF_MAXSIZE);
+	in_len=0;
+	in_used=0;
+	memset((void *)out_buf,0,BUFF_MAXSIZE);
+	out_len=0;
+	out_used=0;
+	socket=0;
+}
+
+socketbuff::socketbuff(int socket):
+out_msg()
+{
+	memset((void *)in_buf,0,2*BUFF_MAXSIZE);
+	in_len=0;
+	in_used=0;
+	memset((void *)out_buf,0,BUFF_MAXSIZE);
+	out_len=0;
+	out_used=0;
+	this->socket=socket;
+}
+
+bool socketbuff::fill_inbuff(char *in,int size)
+{
+	if(in==NULL || size<=0 || size>BUFF_MAXSIZE || in_len+size>2*BUFF_MAXSIZE)
+		return false;
+	memcpy(in_buf+in_len,in,size);
+	in_len+=size;
+	return true;
+}
+
+void socketbuff::reflash_inbuff()
+{
+	if(in_used<=0)
+		return;
+	if(in_used>=in_len)
+	{
+		in_len=0;
+		in_used=0;
+		return;
+	}
+	memcpy(in_buf,in_buf+in_used,in_len-in_used);
+	in_len-=in_used;
+	in_used=0;
+}
+
+int socketbuff::readpkg(msg_pkg& ret)
+{
+	int leftlen=in_len-in_used;
+	cout<<"readpkg1:"<<in_len<<":"<<in_used<<":"<<leftlen<<endl;
+	if(leftlen<HEAD_SIZE)
+	{
+		if(in_used>0)
+		{
+			reflash_inbuff();
+			return 0;
+
+		}
+		else
+		{
+			in_len=0;
+			in_used=0;
+			return -1;
+		}
+	}
+	cout<<"readpkg2:"<<in_len<<":"<<in_used<<":"<<leftlen<<endl;
+	HEAD_TYPE strlen=*((HEAD_TYPE *)(in_buf+in_used));
+	cout<<"readpkg3:"<<strlen<<endl;
+	strlen=HEAD_TRANS(strlen);
+	cout<<"readpkg4:"<<strlen<<endl;
+	if(strlen>BUFF_MAXSIZE-4 || strlen<=0)
+	{
+		in_len=0;
+		in_used=0;
+		return -1;
+	}
+	cout<<"readpkg5:"<<strlen<<endl;
+	int leftstrlen=leftlen-HEAD_SIZE;
+	cout<<"readpkg6:"<<leftstrlen<<endl;
+	if(leftstrlen>=strlen)
+	{
+		ret.rebind(in_buf+in_used+HEAD_SIZE,strlen);
+		in_used+=(strlen+HEAD_SIZE);
+		cout<<"readpkg8:"<<":"<<in_used<<":"<<strlen<<endl;
+	}
+	else
+	{
+		reflash_inbuff();
+		cout<<"readpkg9:"<<":"<<in_len<<":"<<in_used<<endl;
+		return 0;
+	}
+	cout<<"readpkg10:"<<":"<<in_len<<":"<<in_used<<endl;
+	return 1;
+}
+
+msg_pkg &socketbuff::send_begin()
+{
+	out_used=0;
+	out_len=BUFF_MAXSIZE;
+	out_msg.rebind(out_buf,out_len);
+	return out_msg;
+}
+bool socketbuff::send_end()
+{
+	int send_size=out_msg.offset();
+	if(send_size<=4)
+		return false;
+	int body_size=send_size-4;
+	out_msg.seek(0);
+	out_msg.write_uint32(body_size);
+	out_msg.seek(send_size);
+	int ret=write(this->socket,this->out_buf,send_size);
+	if(ret<=0)
+	{
+		return false;
+	}
+	return true;
+}
+
+server::server(void):
+	_rankhandles(),_socketbuff()
+{
+	memset((void *)buf,0,BUFF_MAXSIZE);
+	pretime=time(NULL);
+}
+
+server::~server(void)
+{
+
+}
+
+void server::setnoblock(int sock)
+{
+	int opt;
+	opt=fcntl(sock,F_GETFL);
+	if(opt<0)
+	{
+		return;
+	}
+	opt=opt|O_NONBLOCK;
+	if(fcntl(sock,F_SETFL,opt)<0)
+	{
+		return;
+	}
+	return;
+}
+
+bool server::init(void)
+{
+	cout<<"rankserver init......."<<endl;
+	epfd=epoll_create(FD_SET_SIZE);
+	if(epfd<0)
+	{
+		cout<<"create epoll failed"<<endl;
+		return false;
+	}
+	serveraddr.sin_port=htons(SERV_PORT);
+	serveraddr.sin_family=AF_INET;
+	serveraddr.sin_addr.s_addr=INADDR_ANY;
+	//´´½¨handle
+	int i=0;
+	while(i<handle_count)
+	{
+		
+		_rankhandles[rankhandles[i][0]]=rankhandle(rankhandles[i][0],rankhandles[i][1],rankhandles[i][2]);
+		++i;
+	}
+	this->readobj();
+	return true;
+}
+
+bool server::init(char* port, ConfigMap& config_map)
+{
+	cout<<"rankserver init............."<<endl;
+	epfd = epoll_create(FD_SET_SIZE);
+	if (epfd < 0)
+	{
+		cout<<"create epoll faild"<<endl;
+		return false;
+	}
+	int port_ = atoi(port);
+	serveraddr.sin_port = htons(port_);
+	serveraddr.sin_family = AF_INET;
+	serveraddr.sin_addr.s_addr = INADDR_ANY;
+	int i = 0;
+	while (i < handle_count)
+	{
+		ConfigMap::const_iterator iter = config_map.find(i);
+		if (iter != config_map.end())
+		{
+			_rankhandles[rankhandles[i][0]] = rankhandle(iter->second.businessKey, 
+				iter->second.perblock, iter->second.totalblock);
+		}
+		++i;
+	}
+	this->readobj();
+	return true;
+	
+}
+
+/*
+  added by dy
+*/
+//add new Business
+int server::addBusiness (map<uint64_t, rankhandle>& _rankhandles, BlockConfig nbus) {
+  map<uint64_t, rankhandle>::iterator busit = _rankhandles.find(nbus.businessKey);
+  if (busit != _rankhandles.end()) {
+    cout << "business " << nbus.businessKey << " already existed!" << endl;
+    return 1;
+  } else {
+    _rankhandles[nbus.businessKey] = rankhandle(nbus.businessKey, nbus.perblock, nbus.totalblock);
+  }
+  return 0;
+}
+
+//delete some one Business
+
+int server::removeBusiness (map<uint64_t, rankhandle>& _rankhandles, uint64_t rmv_bkey) {
+  map<uint64_t, rankhandle>::iterator busit = _rankhandles.find(rmv_bkey);
+  if (busit != _rankhandles.end()) {
+    //remove files
+    busit->second.managerRemoveFile(serveraddr.sin_port, rmv_bkey);
+    //remove mem-data
+    _rankhandles.erase(busit);
+    /*
+    string opdir = string(getenv("PWD"));
+    opdir += "/" + server_port;
+    rmdir(opdir + "/data1/" + rmv_bkey);
+    rmdir(opdir + "/data2/" + rmv_bkey);
+    //    "rmv -R opdir + data1 + rmv bkey";
+    //    "rmv -R opdir + data2 + rmv_bkey";
+    */
+  } else {
+    cout << "business " << rmv_bkey << " doesnt exist!" << endl; 
+    return 1;
+  }
+  return 0;
+}
+  
+
+void server::fin(void)
+{
+	cout<<"rankserver fin......."<<endl;
+	map<int,socketbuff *>::iterator beg=_socketbuff.begin();
+	while(beg!=_socketbuff.end())
+	{
+		delete beg->second;
+		++beg;
+	}
+	close(epfd);
+}
+
+vector<uint64_t> server::analyse(string& instr)
+{
+	vector<uint64_t> result;
+	if(instr.empty()|| instr.size()<3)
+		return result;
+	int first=instr.find_first_of("[");
+	int last=instr.size()-1;
+	if(first!=0 || last<first)
+		return result;
+	int douhao=0;
+	int index=first+1;
+	string the_value;
+	stringstream ss_stream;
+	uint64_t value;
+	while(true)
+	{
+		douhao=instr.find_first_of(",",index);
+		if(douhao<0)
+		{
+			the_value=instr.substr(index,last-index+1);
+			ss_stream.clear();
+			ss_stream<<the_value;
+			if(!(ss_stream>>value))
+			{
+				result.clear();
+				return result;
+			}
+			result.push_back(value);
+			break;
+		}
+		else
+		{
+			the_value=instr.substr(index,douhao-index);
+			index=douhao+1;
+			ss_stream.clear();
+			ss_stream<<the_value;
+			if(!(ss_stream>>value))
+			{
+				result.clear();
+				return result;
+			}
+			result.push_back(value);
+		}
+	}
+	return result;
+}
+
+bool server::writeresult(vector<userdata>* ret,msg_pkg& pkg)
+{
+	try
+	{
+		if(ret==NULL)
+		{
+			cout<<"get error"<<endl;
+			pkg.write_uint32(0);
+			return true;
+		}
+		pkg.write_uint32(ret->size());
+		vector<userdata>::iterator beg=ret->begin();
+		vector<userdata>::iterator end=ret->end();
+		while(beg!=end)
+		{
+			cout<<beg->userid<<":"<<beg->uservalue<<":"<<beg->pos<<":"<<beg->len<<endl;
+			pkg.write_uint64(beg->userid);
+			pkg.write_uint64(beg->uservalue);
+			pkg.write_uint32(beg->pos);
+			pkg.write_uint8(beg->len);
+			pkg.write_string(beg->buf,beg->len);
+			++beg;
+		}
+		delete ret;
+		return true;
+	}
+	catch (readException& e)
+	{
+		return false;
+	}
+	
+}
+
+bool server::distribute(int sock,socketbuff *the_buff)
+{
+	int ret=0;
+	do 
+	{
+		
+		msg_pkg pkg;
+		ret=the_buff->readpkg(pkg);
+		cout<<"distribute:"<<ret<<endl;
+		if(ret==-1)
+			return false;
+		else if(ret==0)
+			return true;
+		timeval tv_begin, tv_end;
+		gettimeofday(&tv_begin, NULL);
+		try
+		{
+			unsigned int msg_type=pkg.read_uint32();
+			unsigned int transid=pkg.read_uint32();
+			uint64_t businessKey=pkg.read_uint64();
+			cout<<"distribute:"<<msg_type<<":"<<transid<<":"<<businessKey<<endl;
+			map<uint64_t,rankhandle>::iterator it= _rankhandles.find(businessKey);
+			switch(msg_type)
+			{
+			case FIGHT_MSG_FIGHT_CHECK_REQ:
+			  {
+				// int total = it->second.get_rank_total();
+
+				//
+				unsigned int str_size=pkg.read_uint32();
+				char *data=pkg.read_string((unsigned int)str_size);
+				cout<<"json"<<":"<<data<<endl;
+				
+				//
+				std::pair<int, std::map<int, int>* > callback = fight(data);
+			
+				// int callback = 1;
+				msg_pkg& outpkg = the_buff->send_begin();
+				cout<<"win?"<<callback.first<<endl;
+				outpkg.write_uint32(0);
+				outpkg.write_uint32(FIGHT_MSG_FIGHT_CHECK_RESP);
+				outpkg.write_uint32(transid);
+				outpkg.write_uint32(callback.first);
+				
+				if (callback.second->size() > 0){
+					outpkg.write_uint32(callback.second->size());
+					for (std::map<int, int>::iterator iter = callback.second->begin();iter != callback.second->end();iter++){
+						outpkg.write_uint32(iter->first);
+						outpkg.write_uint32(iter->second);
+						cout<<"item:"<<iter->first<<" ,amount:"<<iter->second<<endl;
+					}
+				} else {
+					outpkg.write_uint32(0);
+				}
+
+				if (OnePiece::AIContext::getInstance()->friends->size() > 1) {
+					outpkg.write_uint32((OnePiece::AIContext::getInstance()->friends->size() - 1));
+					for (std::list<OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->friends->begin(); iter != OnePiece::AIContext::getInstance()->friends->end(); iter++) {
+						if ((*iter)->myID > 0) {
+							outpkg.write_uint32((*iter)->getID());
+							outpkg.write_uint32((*iter)->getHP());
+							outpkg.write_uint32((*iter)->getEnergy());
+std::cout<<"myId"<<(*iter)->myID<<"id"<<(*iter)->getID()<<"hp"<<(*iter)->getHP()<<"mp"<<(*iter)->getEnergy()<<std::endl;
+						}
+					}
+				} else {
+					outpkg.write_uint32(0);
+				}
+
+				if (OnePiece::AIContext::getInstance()->rival_clusters[0]->size() > 0) {
+					outpkg.write_uint32((OnePiece::AIContext::getInstance()->rival_clusters[0]->size()));
+					for (std::list<OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->rival_clusters[0]->begin(); iter != OnePiece::AIContext::getInstance()->rival_clusters[0]->end(); iter++) {
+						if ((*iter)->myID > 0) {
+							outpkg.write_uint32((*iter)->getID());
+							outpkg.write_uint32((*iter)->getHP());
+							outpkg.write_uint32((*iter)->getEnergy());
+std::cout<<"myId"<<(*iter)->myID<<"id"<<(*iter)->getID()<<"hp"<<(*iter)->getHP()<<"mp"<<(*iter)->getEnergy()<<std::endl;
+						}
+					}
+				} else {
+					outpkg.write_uint32(0);
+				}
+
+
+				if(!the_buff->send_end())
+				{
+					return false;
+				}
+			  	break;
+			  }
+			case FIGHT_MSG_FIGHT_DOUJI_REQ:
+			  {
+				// int total = it->second.get_rank_total();
+
+				//
+				unsigned int str_size=pkg.read_uint32();
+				char *data=pkg.read_string((unsigned int)str_size);
+				cout<<"json"<<":"<<data<<endl;
+				
+				//
+				int win[3];
+				for (int i = 0; i < 3; i++) {
+					std::pair<int, std::map<int, int>* > callback = fightDouji(data, i, nullptr);
+					
+					win[i] = callback.first;
+					if (callback.first == 0) {
+						int my_count = 0;
+						for (std::list<OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->friends->begin(); iter != OnePiece::AIContext::getInstance()->friends->end(); iter++) {
+							if ((*iter)->myID > 0 && (*iter)->currentAction < OnePiece::ActionType::DEAD_ACTION1) {
+								my_count++;
+	std::cout<<"myId"<<(*iter)->myID<<"id"<<(*iter)->getID()<<"hp"<<(*iter)->getHP()<<"mp"<<(*iter)->getEnergy()<<std::endl;
+							}
+						}
+						int rival_count = 0;
+						for (std::list<OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->rival_clusters[0]->begin(); iter != OnePiece::AIContext::getInstance()->rival_clusters[0]->end(); iter++) {
+							if ((*iter)->myID > 0 && (*iter)->currentAction < OnePiece::ActionType::DEAD_ACTION1) {
+								rival_count++;
+	std::cout<<"myId"<<(*iter)->myID<<"id"<<(*iter)->getID()<<"hp"<<(*iter)->getHP()<<"mp"<<(*iter)->getEnergy()<<std::endl;
+							}
+						}
+						if (my_count > rival_count) {
+							win[i] = 1;
+						} else if (my_count < rival_count) {
+							win[i] = 2;
+						} else {
+							win[i] = 0;
+						}
+						
+					}
+				}
+				
+				// int callback = 1;
+				msg_pkg& outpkg = the_buff->send_begin();
+				outpkg.write_uint32(0);
+				outpkg.write_uint32(FIGHT_MSG_FIGHT_DOUJI_RESP);
+				outpkg.write_uint32(transid);
+				outpkg.write_uint32(win[0]);
+				outpkg.write_uint32(win[1]);
+				outpkg.write_uint32(win[2]);
+				
+// 				outpkg.write_uint32(0);
+				
+
+// 				if (OnePiece::AIContext::getInstance()->friends->size() > 1) {
+// 					outpkg.write_uint32((OnePiece::AIContext::getInstance()->friends->size() - 1));
+// 					for (std::list<OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->friends->begin(); iter != OnePiece::AIContext::getInstance()->friends->end(); iter++) {
+// 						if ((*iter)->myID > 0) {
+// 							outpkg.write_uint32((*iter)->getID());
+// 							outpkg.write_uint32((*iter)->getHP());
+// 							outpkg.write_uint32((*iter)->getEnergy());
+// std::cout<<"myId"<<(*iter)->myID<<"id"<<(*iter)->getID()<<"hp"<<(*iter)->getHP()<<"mp"<<(*iter)->getEnergy()<<std::endl;
+// 						}
+// 					}
+// 				} else {
+// 					outpkg.write_uint32(0);
+// 				}
+
+				if(!the_buff->send_end())
+				{
+					return false;
+				}
+			  	break;
+			  }
+			  case FIGHT_MSG_FIGHT_DIANFENG_REQ:
+			  {
+				// int total = it->second.get_rank_total();
+
+				//
+				unsigned int str_size=pkg.read_uint32();
+				char *data=pkg.read_string((unsigned int)str_size);
+				cout<<"json"<<":"<<data<<endl;
+				
+				//
+				int win[3];
+				std::list<std::pair<int, std::pair<int, int> > > * hplist  = new std::list<std::pair<int, std::pair<int, int> > >;
+				std::map<int, int>* HPMAP = new std::map<int, int>();
+
+				for (int i = 0; i < 3; i++) {
+					std::pair<int, std::map<int, int>* > callback = fightDouji(data, i, HPMAP);
+					
+					win[i] = (callback.first == 1)?1:0;
+					for (std::list<OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->rival_clusters[0]->begin(); iter != OnePiece::AIContext::getInstance()->rival_clusters[0]->end(); iter++) {
+						if ((*iter)->myID > 0) {
+							std::cout<<"myId"<<(*iter)->myID<<"id"<<(*iter)->getID()<<"hp"<<(*iter)->getHP()<<"mp"<<(*iter)->getEnergy()<<std::endl;
+							std::map<int, int>::iterator hpit = HPMAP->find((*iter)->getID());
+							if (hpit == HPMAP->end()) {
+								HPMAP->insert(std::pair<int, int>((*iter)->getID(), (*iter)->getHP()));
+							}
+							else {
+								hpit->second = (*iter)->getHP();
+							}
+							hplist->push_back(std::pair<int, std::pair<int, int> >(i, std::pair<int, int>((*iter)->getID(), (*iter)->getHP())));
+							
+						}
+					}
+					
+				}
+				delete HPMAP;
+				// int callback = 1;
+				msg_pkg& outpkg = the_buff->send_begin();
+				outpkg.write_uint32(0);
+				outpkg.write_uint32(FIGHT_MSG_FIGHT_DIANFENG_RESP);
+				outpkg.write_uint32(transid);
+				outpkg.write_uint32(win[0]);
+				outpkg.write_uint32(win[1]);
+				outpkg.write_uint32(win[2]);
+
+				outpkg.write_uint32(hplist->size());
+				for (std::list<std::pair<int, std::pair<int, int> > >::iterator iter = hplist->begin(); iter != hplist->end(); iter++) {
+					std::cout<<"cluster"<<(*iter).first<<"id"<<(*iter).second.first<<"hp"<<(*iter).second.second<<std::endl;
+					outpkg.write_uint32((*iter).first);
+					outpkg.write_uint32((*iter).second.first);
+					outpkg.write_uint32((*iter).second.second);
+
+				}
+				delete hplist;
+				
+// 				outpkg.write_uint32(0);
+				
+
+// 				if (OnePiece::AIContext::getInstance()->friends->size() > 1) {
+// 					outpkg.write_uint32((OnePiece::AIContext::getInstance()->friends->size() - 1));
+// 					for (std::list<OnePiece::CharacterData*>::iterator iter = OnePiece::AIContext::getInstance()->friends->begin(); iter != OnePiece::AIContext::getInstance()->friends->end(); iter++) {
+// 						if ((*iter)->myID > 0) {
+// 							outpkg.write_uint32((*iter)->getID());
+// 							outpkg.write_uint32((*iter)->getHP());
+// 							outpkg.write_uint32((*iter)->getEnergy());
+// std::cout<<"myId"<<(*iter)->myID<<"id"<<(*iter)->getID()<<"hp"<<(*iter)->getHP()<<"mp"<<(*iter)->getEnergy()<<std::endl;
+// 						}
+// 					}
+// 				} else {
+// 					outpkg.write_uint32(0);
+// 				}
+
+				if(!the_buff->send_end())
+				{
+					return false;
+				}
+			  	break;
+			  }
+			default:
+				cout<<"err parm"<<endl;
+				return false;
+			}
+			gettimeofday(&tv_end, NULL);
+			unsigned int pertime=(int)(1000000 * (tv_end.tv_sec - tv_begin.tv_sec) + tv_end.tv_usec - tv_begin.tv_usec);
+			if(pertime>maxtime)
+			{
+				maxtime=pertime;
+			}
+			totaltime+=pertime;
+			++totalcount;
+			cout<<"perhandle time:"<<totaltime<<":"<<totalcount<<":"<<totaltime/totalcount<<":"<<pertime<<endl;
+		}
+		catch (readException& e)
+		{
+			cout<<"read err"<<endl;
+			return false;
+		}
+		catch(writeException& e)
+		{
+			cout<<"write err"<<endl;
+			return true;
+		}
+	} while (ret==1);
+	return true;
+}
+
+
+/*void server::init_daemon()
+{
+	 int pid;
+  int i;
+
+  if(pid=fork())
+    exit(0);//æ˜¯çˆ¶è¿›ç¨‹ï¼Œç»“æŸçˆ¶è¿›ç¨‹
+  else if(pid< 0)
+    exit(1);//forkå¤±è´¥ï¼Œé€€å‡?
+
+  setsid();//ç¬¬ä¸€å­è¿›ç¨‹æˆä¸ºæ–°çš„ä¼šè¯ç»„é•¿å’Œè¿›ç¨‹ç»„é•¿
+  if(pid=fork())
+    exit(0);//æ˜¯ç¬¬ä¸€å­è¿›ç¨‹ï¼Œç»“æŸç¬¬ä¸€å­è¿›ç¨?
+  else if(pid< 0)
+    exit(1);//forkå¤±è´¥ï¼Œé€€å‡?
+
+  chdir("/tmp");//æ”¹å˜å·¥ä½œç›®å½•åˆ?tmp
+  umask(0);//é‡è®¾æ–‡ä»¶åˆ›å»ºæŽ©æ¨¡
+  return;
+}*/
+
+bool server::run(void)
+{
+	#if OSFLAG==WINDOWS
+	
+	#else
+		signal(SIGPIPE,SIG_IGN);
+		cout<<"rankserver run......."<<endl;
+		
+		listenfd= socket(AF_INET,SOCK_STREAM,0);
+		//µØÖ·ÖØÓÃ
+		int value = 1;
+		if(setsockopt(listenfd,SOL_SOCKET,SO_REUSEADDR,(void *)&value,sizeof(value))==-1)
+		{
+			perror("REUSEADDR");
+			return false;
+		}
+		setnoblock(listenfd);
+		//ÉèÖÃ¼àÌý¶Ë¿ÚÊÂ¼þ
+		ev.events=EPOLLIN|EPOLLET;
+		ev.data.fd=listenfd;
+		epoll_ctl(epfd,EPOLL_CTL_ADD,listenfd,&ev);
+	
+		if (bind(listenfd,(sockaddr *)&serveraddr,sizeof(serveraddr)) < 0)
+		{
+			perror("bind error");
+			return false;
+		}
+		if (listen(listenfd,LISTEN) < 0)
+		{
+			perror("listen error");
+			return false;
+		}
+	
+		cout<<"listen completed"<<endl;
+		
+		while(true)
+		{
+			int nfds=0;
+			do
+			{
+				
+				nfds=epoll_wait(epfd,events,EVENT_MAXSIZE,10*60*1000);
+			} while(nfds <0 && errno == EINTR);
+	
+			if(nfds<0)
+			{
+				
+				cout<<"epoll_wait failed,errno:"<<errno<<endl;
+				return false;
+			}
+			for(int i=0;i<nfds;++i)
+			{
+				
+				if(events[i].data.fd==listenfd)//ÓÐÐÂÁ¬½Ó
+				{
+					int connfd=0;
+					while(true)
+					{
+						
+						connfd=accept(listenfd,(sockaddr *)&clientaddr,&client);
+						if(connfd <0)
+						{
+							if(errno == EINTR)
+							{
+								continue;
+							}
+							else if(errno == EWOULDBLOCK || errno == EAGAIN)
+							{
+								cout<<"accept full:"<<errno<<endl;
+								break;
+							}
+							else
+							{
+								cout<<"accept failed,errno:"<<errno<<endl;
+								return false;
+							}
+						}
+						setnoblock(connfd);
+						int  param=1; 
+						int keepIdle = 60; // Èç¸ÃÁ¬½ÓÔÚ60ÃëÄÚÃ»ÓÐÈÎºÎÊý¾ÝÍùÀ´,Ôò½øÐÐÌ½²â 
+						int keepInterval = 5; // Ì½²âÊ±·¢°üµÄÊ±¼ä¼ä¸ôÎª5 Ãë
+						int keepCount = 3; //Ì½²â³¢ÊÔµÄ´ÎÊý.Èç¹ûµÚ1´ÎÌ½²â°ü¾ÍÊÕµ½ÏìÓ¦ÁË,Ôòºó2´ÎµÄ²»ÔÙ·¢.
+						setsockopt(connfd,SOL_SOCKET,SO_KEEPALIVE,(char*)&param,sizeof(param));
+						setsockopt(connfd, SOL_TCP, TCP_KEEPIDLE, (void*)&keepIdle, sizeof(keepIdle));
+						setsockopt(connfd, SOL_TCP, TCP_KEEPINTVL, (void *)&keepInterval, sizeof(keepInterval));
+						setsockopt(connfd, SOL_TCP, TCP_KEEPCNT, (void *)&keepCount, sizeof(keepCount));
+						char *connaddr=inet_ntoa(clientaddr.sin_addr);
+						cout<<"connect from:"<<connaddr<<"port:"<<ntohs(clientaddr.sin_port)<<endl;
+						//fputs(connaddr,fp);
+						ev.data.fd=connfd;
+						ev.events=EPOLLIN|EPOLLET;
+						epoll_ctl(epfd,EPOLL_CTL_ADD,connfd,&ev);
+						socketbuff *temp=new socketbuff(connfd);
+						if(temp==NULL)
+							return false;
+						_socketbuff[connfd]=temp; 
+					}
+				}
+				else if(events[i].events & EPOLLIN)
+				{
+					int socketfd=0;
+					if((socketfd=events[i].data.fd)<0)
+					{
+						cout<<"epoll in error"<<endl;
+						continue;
+					}
+					//ÖØÖÃ
+					int n=0;
+					bool cancel=false;
+					map<int,socketbuff *>::iterator ret=_socketbuff.find(socketfd);
+					if(ret==_socketbuff.end())
+					{
+						return false;
+					}
+					do
+					{
+						memset(buf,0,BUFF_MAXSIZE);
+						n=read(socketfd,buf,BUFF_MAXSIZE);
+						cout<<"data1:"<<n<<":"<<errno<<endl;
+						if(n<0)
+						{
+							if(errno==ECONNRESET)
+							{
+								close(socketfd);
+								delete ret->second;
+								_socketbuff.erase(ret);
+								events[i].data.fd=-1;
+								cout<<"socket closed 1:"<<errno<<endl;
+							}
+							else if(!(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+							{
+								close(socketfd);
+								delete ret->second;
+								_socketbuff.erase(ret);
+								events[i].data.fd=-1;
+								cout<<"socket closed 2:"<<errno<<endl;
+							}
+						}
+						else if(n==0)
+						{
+							close(socketfd);
+							delete ret->second;
+							_socketbuff.erase(ret);
+							events[i].data.fd=-1;
+							cout<<"socket closed 3"<<endl;
+						}
+						else
+						{   
+							if(!cancel)
+							{
+								cout<<"data2:"<<n<<endl;
+								if(ret->second->fill_inbuff(buf,n))
+								{
+									cout<<"data3:"<<endl;
+									bool result=distribute(socketfd,ret->second);
+									if(!result)
+									{
+										cancel=true;
+									}
+								}
+								else
+									cancel=true;
+							}
+						}
+					}while((n <0 && errno == EINTR)|| n==BUFF_MAXSIZE);
+	
+				}
+			}
+			time_t now=time(NULL);
+			time_t span=now-pretime;
+			cout<<"log log\t"<<span<<endl;
+			if(span>=10*60)
+			{
+				timeval tv_begin, tv_end;
+				gettimeofday(&tv_begin, NULL);
+				this->writeobj();
+				gettimeofday(&tv_end, NULL);
+				unsigned int pertime=(int)(1000000 * (tv_end.tv_sec - tv_begin.tv_sec) + tv_end.tv_usec - tv_begin.tv_usec);
+				cout<<"perwrite time:"<<pertime<<endl;
+				pretime=now;
+			}
+		}
+	#endif
+		return true;
+}
+
+#define RANKVERTION 10000
+void server::readobj()
+{
+	stringstream sstr;
+	std::string path;
+	sstr << ntohs(serveraddr.sin_port);
+	sstr >> path;
+
+	rankserialization filestream;
+	char filename[256];
+	
+	try
+	{
+		/*string dirname="./data1";
+		if(Dir_index==2)
+		{
+			dirname="./data2";
+		}*/
+		std::string dirname = "/data1";
+		if (2 == Dir_index){
+			dirname = "/data2";		
+		}
+		dirname = "./"+path+dirname;
+
+		if(!filestream.read_open(dirname+string("/rankdataindex.in")))
+		{
+			return;
+		}
+		cout<<"readobjbegin"<<endl;
+		int vertion=filestream.read_uint32();
+		if(vertion!=RANKVERTION)
+			return;
+		cout<<"readobjbegin1:"<<vertion<<endl;
+		int buss_len=filestream.read_uint32();
+		int i=0;
+		cout<<"readobjbegin2:"<<buss_len<<endl;
+		while(i<buss_len)
+		{
+			uint64_t busi=filestream.read_uint64();
+			int namelen=filestream.read_uint8();
+			cout<<"readobjbegin6:"<<namelen<<endl;
+			int str_len=filestream.read_string(filename,namelen);
+			filename[namelen]=0;
+			cout<<"readobjbegin3:"<<str_len<<":"<<busi<<":"<<filename[0]<<endl;
+			map<uint64_t,rankhandle>::iterator bit=_rankhandles.find(busi);
+			if(bit!=_rankhandles.end())
+			{
+				cout<<"readobjbegin4:"<<busi<<endl;
+				bit->second.read(dirname,string(filename));
+				cout<<"readobjbegin5:"<<bit->second.get_data().size()<<endl;
+			}
+			++i;
+		}
+
+	}
+	catch (readException& e)
+	{
+	}
+}
+
+void server::writeobj()
+{
+	/*string dirname="./data1";
+	if(serializIndex%2==1)
+	{
+		dirname="./data2";
+	}
+	if(NULL==opendir(dirname.c_str()))
+	{
+		mkdir(dirname.c_str(),0775);
+	}*/
+	string dirname = getDataDir(ntohs(serveraddr.sin_port), serializIndex);	
+	//cout<<"dirname is: "<<dirname<<endl;
+	++serializIndex;
+	rankserialization filestream;
+	if(!filestream.write_open(dirname+string("/rankdataindex.in")))
+	{
+		return;
+	}
+	cout<<"log begin 0"<<endl;
+	int i=0;
+	int &t=i;
+	cout<<"log begin 1"<<endl;
+	filestream.write_uint32(RANKVERTION);
+	cout<<"log begin 2"<<endl;
+	filestream.write_uint32(_rankhandles.size());
+	cout<<"log begin 3"<<endl;
+	map<uint64_t,rankhandle>::iterator beg=_rankhandles.begin();
+	map<uint64_t,rankhandle>::iterator end=_rankhandles.end();
+	cout<<"log begin"<<endl;
+
+	while(beg!=end)
+	{
+		filestream.write_uint64(beg->first);
+		stringstream ss;
+		ss<<beg->first<<"index"<<".in";
+		string name=ss.str();
+		//cout<<"log begin 4"<<name<<endl;
+		filestream.write_uint8(name.size());
+		//cout<<"log begin 5"<<name.size()<<endl;
+		filestream.write_string((char *)(name.c_str()),name.size());
+		beg->second.write(dirname,name);
+		++beg;
+	}
+	filestream.close();
+}
+
+std::string server::getDataDir(const short port, int index)
+{
+	std::string dir;
+	std::string path;
+	stringstream sstr;
+	std::string dir_name = "data1";
+
+	sstr << port;
+	sstr >> path;
+	
+	if (index%2 == 1)
+	{
+		dir_name = "data2";
+	}
+	if (-1 == chdir(path.c_str())){
+		if (0 == mkdir(path.c_str(), 0755)){
+			dir = "./"+path;    
+		}   
+		if (0 == chdir(path.c_str())){
+			if (0 == mkdir(dir_name.c_str(),0755)){
+				chdir("../");
+				return dir+"/"+dir_name;
+			}   
+		}   
+	}
+	else{
+		dir = "./"+path;
+		if (-1 == chdir(dir_name.c_str())){
+			if (0 == mkdir(dir_name.c_str(), 0755))
+			{   
+				chdir("../");
+				return dir+"/"+dir_name;    
+			}   
+		}   
+		else{
+			chdir("../../");
+			return dir+"/"+dir_name;
+		}   
+	}
+	return dir;
+}
