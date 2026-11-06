@@ -1528,7 +1528,8 @@ static int luabind_characterdata_update_energy(lua_State *L)
 {
     auto the_character = luastack_getcharacterdata(L, 1);
     int the_energy = lua_tointeger(L, 2);
-    the_character->updateEnergy(the_energy);
+    int is_kill = lua_toboolean(L, 3);
+    the_character->updateEnergy(the_energy,is_kill);
     return 0;
 }
 

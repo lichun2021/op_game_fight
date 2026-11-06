@@ -19,6 +19,10 @@
 #include "scriptbind/AIScriptBindEffectCaster.hpp"
 #include "AITargetHelper.h"
 
+#ifndef SERVER_VERIFYING
+#include "../DataManager/DataManager.h"
+#endif
+
 namespace OnePiece {
 
     ExecExcuteInfo::ExecExcuteInfo(
@@ -86,8 +90,14 @@ namespace OnePiece {
         /// 12.0
         if (aiContext.isBeingFinalClear() && aiContext.shouldStopExecWhenBeingFinalClear())
             return;
-
-        //if (skillID == 45701) {
+#ifdef OPTOOLS
+        // 实际执行时此处不一定调用
+        int tmpCurrentSkillID = aiContext.currentSkillID;
+        aiContext.currentSkillID = skillID;
+        int tmpCurrentExecID = aiContext.currentExecID;
+        aiContext.currentExecID = execID;
+#endif
+        //if (execID == 599999) {
         //    CCLOG("find excid");
         //}
 
@@ -102,7 +112,7 @@ namespace OnePiece {
         else if (IsSoundExec(execID))
             executeAudio(aiContext, execID, skillLevel, source, projectile, target, parentTicklen);
         else if (IsSpecialUIEffectExec(execID))
-            executeSpecialEffect(aiContext, 0, execID, skillLevel, source, projectile, target, parentTicklen,useLogicPos);
+            executeSpecialEffect(aiContext, 0, execID, skillLevel, skillID, source, projectile, target, parentTicklen,useLogicPos);
         else if (IsSpecialExec(execID))
             executeSpecialExec(aiContext, execID, skillID, source, projectile, target, parentTicklen);
         else if (IsAnimationExec(execID))
@@ -117,6 +127,11 @@ namespace OnePiece {
             executeTransformExec(aiContext, execID, skillID, skillLevel, source, projectile, target, parentTicklen, useLogicPos);
         else if (IsBodyUIEffectExec(execID))
             executeBodyEffect(aiContext, 0, execID, skillLevel, source, projectile, target, parentTicklen);
+#ifdef OPTOOLS
+        // 实际执行时此处不一定调用
+        aiContext.currentSkillID = tmpCurrentSkillID;
+        aiContext.currentExecID = tmpCurrentExecID;
+#endif
     }
 
     //新增延时执行，主要针对特效 声音 文字 等表现入口 cui 2020_2_23  op3  delayAIAction
@@ -143,15 +158,52 @@ namespace OnePiece {
             aiContext.audioProxy->executeExec(aiContext, audioID, skillLevel, source, projectile, target, parentTicklen);
     }
     
-    void AIActionController::executeSpecialEffect(AIContext& aiContext, int parentExecID, int seffID, int skillLevel, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen, bool useLogicPos, int altLinkEffLinkTick)
+    void AIActionController::executeSpecialEffect(AIContext& aiContext, int parentExecID, int seffID, int skillLevel, int skillID, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen, bool useLogicPos, int altLinkEffLinkTick)
     {
-        if (aiContext.seffProxy != nullptr)
+        if (aiContext.seffProxy != nullptr) {
+#ifndef SERVER_VERIFYING
+            int rank = OnePiece::DataManager::getInstance()->getMemRank();
+
+
+            switch (rank)
+            {
+            case 0:     // a、所有特效均展示
+                break;
+            case 1:     // b、策划配置展示部分角色的技能特效
+                {
+                    SpecialUIEffectExec* effExec = AIDataHelper::getSpecialUIEffectExec(seffID);
+                    if (effExec != nullptr && effExec->unShow == 1) { // 判断是否配置 不显示
+                        return;
+                    }
+                }
+                break;
+            case 2:     // c、allUnShow 字段控制不播放
+                // c、除角色大招外的所有技能特效均不展示，只展示角色大招技能特效
+                //if (skillID >= 0) { // 判断是否大招 只显示大招
+                //    AISkill* skill = AIDataHelper::getSkillData(skillID);
+                //    if (skill != nullptr && skill->skillType != 0) // 0 大招  1 小招
+                //        return;
+                //}
+                {
+                    SpecialUIEffectExec* effExec = AIDataHelper::getSpecialUIEffectExec(seffID);
+                    if (effExec != nullptr && effExec->allUnShow == 1) { // 判断是否配置 不显示
+                        return;
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+        
+#endif // Presentation quality policy is client-only.
             aiContext.seffProxy->executeExec(aiContext, parentExecID, seffID, skillLevel, source, projectile, target, parentTicklen, useLogicPos, altLinkEffLinkTick);
+        }
+
     }
 
-    void AIActionController::executeSpecialEffect(AIContext& aiContext, int parentExecID, int seffID, int skillLevel, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen, bool useLogicPos)
+    void AIActionController::executeSpecialEffect(AIContext& aiContext, int parentExecID, int seffID, int skillLevel, int skillID, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen, bool useLogicPos)
     {
-        executeSpecialEffect(aiContext, parentExecID, seffID, skillLevel, source, projectile, target, parentTicklen, useLogicPos, 0);
+        executeSpecialEffect(aiContext, parentExecID, seffID, skillLevel, skillID, source, projectile, target, parentTicklen, useLogicPos, 0);
     }
     
     void AIActionController::executeSpecialExec(AIContext& aiContext, int seffID, int skillID, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen)

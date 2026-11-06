@@ -1,4 +1,4 @@
-﻿//
+//
 //  AIContext.cpp
 //  OnePiece
 //
@@ -9,6 +9,9 @@
 #include "AIContext.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <limits>
+#include <cstring>
 #include <stdlib.h>
 #include <thread>
 #include "cocos2d.h"
@@ -33,7 +36,9 @@
 #include "projectile/ProjectileForWarship.h"
 #include "BattleLog.h"
 #include "AITargetHelper.h"
-
+#ifdef DENA_OP3
+#include "../ResourceManager/ResourceManager.h"
+#endif // DENA_OP3
 
 using namespace std;
 
@@ -184,6 +189,32 @@ namespace OnePiece {
 
     void AIContext::clear()
     {
+
+#ifdef OPTOOLS
+        // 2023/08/15, quanhao.liu, op tools
+        skillCount.clear(); // skillId, count
+        skillInfoLogs.clear();
+        skillInfoLogsMap.clear(); // skillId, index, 定位skillInfoLogs,O(1)
+        currentSkillID = 0;
+        currentExecID = 0;
+        // 用于AICharacterData::updateHP时定位当前上下文的伤害日志
+        currentHPDeltaCasterMyId = 0;
+        currentHPDeltaCasterId = 0;
+        casterFindSkillIndexMap.clear(); // caster.myID, skillInfoLogsIndex
+        caseterFindIndexMap.clear(); // caster.myID, casterIndex
+        hurtInfoLogsMap.clear(); // myID, 日志指针
+        movementInfoLogsMap.clear(); // myID, 日志指针
+        projectileInfoLogsMap.clear(); // myID, 日志指针
+        effectInfoLogsMap.clear(); // myID, 日志指针
+        markInfoLogsMap.clear(); // myID, 日志指针
+        summonInfoLogsMap.clear(); // myID, 日志指针
+#endif
+
+        //AIActionController::executeExec(*this, 87773, 0, 1, nullptr, nullptr, nullptr, 0);
+        //AIActionController::executeExec(*this, 87771, 0, 1, nullptr, nullptr, nullptr, 0);
+
+        AIActionController::executeExec(*this, 85592, 0, 1, nullptr, nullptr, nullptr, 0);
+
         _isBeingFinalClear = true;
 
         StatsFunc::ResetStats();
@@ -308,6 +339,7 @@ namespace OnePiece {
 
         AIActionController::executeExec(*this, 87773, 0, 1, nullptr, nullptr, nullptr, 0);
         AIActionController::executeExec(*this, 87771, 0, 1, nullptr, nullptr, nullptr, 0);
+
 
         //cui 2023_2_24 延时执行列表
         for (std::list<DelayAIActionData*>::iterator iter = dalayAIActionList.begin(); iter != dalayAIActionList.end();)
@@ -455,6 +487,9 @@ namespace OnePiece {
         AIDataHelper::unload();
         AIDataManager::unload();
 #endif
+#ifdef DENA_OP3
+        ResourceManager::getInstance()->RemoveUnusedTexture(); //战斗结束及时释放纹理 
+#endif // DENA_OP3
 
         _isBeingFinalClear = false;
     }
@@ -469,6 +504,8 @@ namespace OnePiece {
 
         AIActionController::executeExec(*this, 87773, 0, 1, nullptr, nullptr, nullptr, 0);
         AIActionController::executeExec(*this, 87771, 0, 1, nullptr, nullptr, nullptr, 0);
+
+        AIActionController::executeExec(*this, 85592, 0, 1, nullptr, nullptr, nullptr, 0);
 
 
         for (std::list<AIProjectile*>::iterator pProjectile = projectileList.begin(); pProjectile != projectileList.end();)
@@ -2311,9 +2348,9 @@ namespace OnePiece {
                 clusterNum = 1;
             }
         }
-#if BATTLE_LOG_TEST
-        OPBattleLog("AI:add hero(%d):(team-cluster)%d-%d", attList[0], teamSide, clusterNum);
-#endif
+
+        CCLOG("AI:add hero(%d):(team-cluster)%d-%d", attList[0], teamSide, clusterNum);
+
         CharacterData* cd = new CharacterData(attList, skillList, juexing, *this, type, k, ifUltraLock, clusterNum, NULL, teamSide, RoleType::kNormalCharacter, fp);
 
         if (_isLuaReady)
@@ -2326,7 +2363,7 @@ namespace OnePiece {
         }
 
 #if BATTLE_LOG_TEST
-        OPBattleLog("addhero：", teamSide, clusterNum, cd->getID());
+        OPBattleLog("addhero", teamSide, clusterNum, cd->getID());
 #endif
         
         CharacterDataListPtr sameClusterHeroes = getClusterOrigin(teamSide, clusterNum);
@@ -2362,9 +2399,9 @@ namespace OnePiece {
             if (_pCannonKing->bossClusterNum < clusterNum)
                 _pCannonKing->bossClusterNum = clusterNum;
         }
-#if BATTLE_LOG_TEST
-        OPBattleLog("add hero:cluster(%d), staticID(%d)", clusterNum, cd->attributes[0]);
-#endif
+
+        //CCLOG("add hero:cluster(%d), staticID(%d)", clusterNum, cd->attributes[0]);
+
         checkAddHeroSummonCharacter(cd, type, teamSide);
         
 		return cd->myID;
@@ -3085,6 +3122,67 @@ namespace OnePiece {
         return count;
     }
 
+
+    CharacterDataList AIContext::getSameSideAliveCharacterList(TeamSide mySide, int clusterNum, bool isFriend, bool excludeSummon)
+    {
+        (void)isFriend; // Retained ABI parameter; original traverses both lists.
+        CharacterDataList result;
+        auto friends = getFriendsForCluster(mySide, clusterNum, excludeSummon);
+        auto rivals = getRivalsForCluster(mySide, clusterNum, excludeSummon);
+        for (auto list : {friends, rivals})
+            for (auto character : *list)
+            {
+                if (!character || HeroActionController::isDeadAction(character->currentAction)) continue;
+                if (excludeSummon && character->isSummon()) continue;
+                if (character->teamSide != mySide) continue;
+                result.push_back(character);
+            }
+        return result;
+    }
+
+    int AIContext::getSameSideAliveCount(TeamSide mySide, int clusterNum, bool isFriend, bool excludeSummon)
+    {
+        CharacterDataListPtr pCharacterList1 = nullptr;
+        CharacterDataListPtr pCharacterList2 = nullptr;
+        
+        pCharacterList1 = getFriendsForCluster(mySide, clusterNum, excludeSummon);
+     
+        pCharacterList2 = getRivalsForCluster(mySide, clusterNum, excludeSummon);
+
+        int count = 0;
+        if (pCharacterList1) {
+            for (auto character : *pCharacterList1)
+            {
+                if (!character || HeroActionController::isDeadAction(character->currentAction))
+                    continue;
+                if (excludeSummon && character->isSummon())
+                    continue;
+
+                if (mySide != character->teamSide) {
+                    continue;
+                }
+                count++;
+            }
+        }
+
+        if (pCharacterList2) {
+            for (auto character : *pCharacterList2)
+            {
+                if (!character || HeroActionController::isDeadAction(character->currentAction))
+                    continue;
+                if (excludeSummon && character->isSummon())
+                    continue;
+                if (mySide != character->teamSide) {
+                    continue;
+                }
+
+                count++;
+            }
+        }
+        return count;
+    }
+
+
     void AIContext::scheduleNotifyUIEff(int scheduleTick, int parentExecMyID)
     {
         _scheduleNotifyUIEffs[scheduleTick].push_back(parentExecMyID);
@@ -3640,7 +3738,7 @@ namespace OnePiece {
                 {
                     if (CharacterFunc::HasLabel(character, labelType[j])) {
                         labelNum[j]++;
-                        break;
+                        continue;
                     }
                 }
             }
@@ -3691,5 +3789,68 @@ namespace OnePiece {
         }
     }
 
+#ifdef OPTOOLS
+    // quanhao.liu 2023/8/23
+    int AIContext::getSkillInfoLogsIndex(int skillID)
+    {
+        auto search = this->skillInfoLogsMap.find(skillID);
+        if (search != this->skillInfoLogsMap.end()) {
+            return search->second;
+        }
+        return -1;
+    }
+    SkillInfoLog* AIContext::getSkillInfoLog(int skillID, int skillLevel, int casterMyID)
+    {
+        int idx = this->getSkillInfoLogsIndex(skillID);
+        if (idx != -1) {
+            return this->skillInfoLogs[idx];
+        }
+        SkillInfoLog* skillInfoLog = new SkillInfoLog();
+        skillInfoLog->skillID = skillID;
+        skillInfoLog->skillLevel = skillLevel;
+        skillInfoLog->currentTick = this->currentTick;
+        this->skillInfoLogs.push_back(skillInfoLog);
+        this->skillInfoLogsMap.insert({ skillID, this->skillInfoLogs.size() - 1 });
+        return skillInfoLog;
+    }
+    // 技能触发次数
+    void AIContext::incSkillTriggerCount(int skillID)
+    {
+        auto search = this->skillCount.find(skillID);
+        if (search != this->skillCount.end()) {
+            search->second++;
+        }
+        else {
+            this->skillCount.insert({ skillID, 1 });
+        }
+    }
+#endif
+
+
+    // AArch64 FCVTMS semantics: floor, with signed int32 saturation.
+    static int op38NativeFloorInt32(double value)
+    {
+        if (std::isnan(value)) return 0;
+        if (value >= 2147483648.0) return std::numeric_limits<int32_t>::max();
+        if (value <= -2147483648.0) return std::numeric_limits<int32_t>::min();
+        return static_cast<int32_t>(std::floor(value));
+    }
+
+    int AIContext::getFinalValue(int add, int cut, int value)
+    {
+        const uint32_t raw = uint32_t(add) - uint32_t(cut);
+        int32_t difference;
+        std::memcpy(&difference, &raw, sizeof(difference));
+        float multiplier = static_cast<float>(1.0 + double(difference) / 10000.0);
+        if (double(multiplier) < 0.1) multiplier = 0.1f;
+        const float product = multiplier * static_cast<float>(value);
+        return op38NativeFloorInt32(double(product));
+    }
+
+    int AIContext::getPercentAddValue(int add, int base)
+    {
+        const double multiplier = 1.0 + double(add) / 10000.0;
+        return op38NativeFloorInt32(multiplier * double(base));
+    }
 
 }

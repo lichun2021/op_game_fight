@@ -1,4 +1,4 @@
-﻿//
+//
 //  AIPlatformHelper.cpp
 //  op_game
 //
@@ -7,6 +7,12 @@
 //
 
 #include "AIPlatformHelper.hpp"
+#include <stdexcept>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <limits.h>
+#include <cstdlib>
+#endif
 #ifdef __unix__
 #include <unistd.h>
 #endif
@@ -18,13 +24,8 @@ namespace OnePiece {
     std::string AIPlatformHelper::getPlatformName()
     {
 #ifdef SERVER_VERIFYING
-#ifdef WIN32
-        return "WIN32_SERVER";
-#elif defined __APPLE__
-        return "MACOS_SERVER";
-#else
+// Headless verification uses server-only Lua branches on every host.
         return "SERVER";
-#endif
 
         
 #elif defined CC_TARGET_PLATFORM
@@ -51,10 +52,17 @@ namespace OnePiece {
     
     std::string AIPlatformHelper::getExecutablePath()
     {
-#ifdef __unix__
-        char buf[256];
-        readlink("/proc/self/exe", buf, 256);
-        std::string execPath = buf;
+#ifdef __APPLE__
+        char buffer[PATH_MAX], resolved[PATH_MAX]; uint32_t size=sizeof(buffer);
+        if (_NSGetExecutablePath(buffer, &size) != 0 || !realpath(buffer, resolved))
+            throw std::runtime_error("executable path unavailable");
+        std::string path(resolved);
+        return path.substr(0, path.find_last_of("/"));
+#elif defined __unix__
+        char buf[4096];
+        ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf)-1);
+        if (n <= 0 || n >= ssize_t(sizeof(buf)-1)) throw std::runtime_error("executable path unavailable");
+        std::string execPath(buf, size_t(n));
         auto lastSlashPos = execPath.find_last_of("/");
         if (lastSlashPos == std::string::npos)
             return "./";

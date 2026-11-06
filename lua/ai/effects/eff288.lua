@@ -192,7 +192,7 @@ eff.check_do_simu = function(character, attacker, hpdelta)
         local amid = aneff:get_innerdata("mid")
 
         local absorbrate = aneff:get_changevalue() / 10000
-        if achangevalue > 0 then
+        if absorbrate > 0 then
             absorbedhpdelta = math.floor( absorbedhpdelta + hpdelta * absorbrate )
         end
     end

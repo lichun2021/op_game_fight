@@ -1,4 +1,4 @@
-﻿//
+//
 //  AICharacterData.cpp
 //  OnePiece
 //
@@ -72,6 +72,8 @@ namespace OnePiece {
 		m_bInCharmEffect = false;
 		m_bInTauntEffect = false;
         _isInHalfCharmEffect = false;
+
+        _isInConfusionEffect = false;
         
         m_iSkillSeq2Index = 0;
         
@@ -86,29 +88,19 @@ namespace OnePiece {
 		aiContext.allCharacters[myID] = this;
 
 		attributes = attList;
-
 		staticData = AIDataHelper::getCharacterData(*attList);
 
 		CharacterFunc::CopyOldFashionAttributes(attributes, attributesOrigin.get());
-#if BATTLE_LOG_TEST
-        OPBattleLog("CharacterData 4 start");
-#endif
+
 		for (auto iter = skillList.begin(); iter != skillList.end(); ++iter)
 		{
 			if (iter->first < 1 || iter->second < 1) continue;
 
-
-            #if BATTLE_LOG_TEST
-                    OPBattleLog("CharacterData 4 1");
-
-            #endif
 			if (iter->first == staticData->sk[0])
 			{
 				normalSkill.first = iter->first;
 				normalSkill.second = iter->second;
-                #if BATTLE_LOG_TEST
-                    OPBattleLog("normalSkillID ",normalSkill.first);
-                #endif
+                
                 int useSkillAdd = 0;
                 AIDataHelper::getBeHittedAddEnergy(normalSkill.first, useSkillAdd, _beHittedAddEnergy);
             }
@@ -119,30 +111,51 @@ namespace OnePiece {
             
 
 			this->skillList.push_back(std::pair<int, int>(iter->first, iter->second));
+
+            std::vector<int> relativeSkills = AIDataHelper::getTransformEffectConf(iter->first);
+            if (relativeSkills.size() > 0) {
+                for (int j = 0; j < relativeSkills.size(); j++)
+                {
+                    int skilID = relativeSkills.at(j);
+                    if (skilID == 0) {
+                        continue;
+                    }
+                    this->skillList.push_back(std::pair<int, int>(skilID, iter->second));
+                }
+            }
+            relativeSkills.clear();
+
 			int jlevel = juexingLevel;
 			if (jlevel > 5)jlevel = 5;//max juexing=5 now
 			if (iter->first == staticData->sk[1] && staticData->jxj[3 * jlevel]>0){
 				this->skillList.push_back(std::pair<int, int>(staticData->jxj[3 * jlevel], iter->second));
+
+               relativeSkills = AIDataHelper::getTransformEffectConf(staticData->jxj[3 * jlevel]);
+               if (relativeSkills.size() > 0) {
+                     for (int j = 0; j < relativeSkills.size(); j++)
+                        {
+                        int skilID = relativeSkills.at(j);
+                        if (skilID == 0) {
+                            continue;
+                        }
+                        this->skillList.push_back(std::pair<int, int>(skilID, iter->second));
+                    }
+                }
+                relativeSkills.clear();
+
 			}
 
             auto skillID = iter->first;
             auto skillLevel = iter->second;
-             #if BATTLE_LOG_TEST
-                    OPBattleLog("CharacterData 4 2");
-            #endif
+
             auto skillData = AIDataHelper::getSkillData(skillID);
             if (skillData)
             {
-                #if BATTLE_LOG_TEST
-                    OPBattleLog("CharacterData 4 3");
-                #endif
                 if (HeroSkillController::isSkillDataIgnoreSilence(skillData))
                 {
                     ignoreSilenceSkill[skillID] = true;
                 }
-                #if BATTLE_LOG_TEST
-                    OPBattleLog("CharacterData 4 4");
-                #endif
+
                 auto pSkill = SpecialSkillInfo::create(staticData, skillID, skillLevel, skillData);
                 if (pSkill)
                 {
@@ -150,16 +163,14 @@ namespace OnePiece {
                         aiContext.addEventListener("hpchange", this);
                     _specialSkills[skillData->castCondition].push_back(std::move(pSkill));
                 }
-                #if BATTLE_LOG_TEST
-                    OPBattleLog("CharacterData 4 5");
-                #endif
+
                 if (skillData->castCondition == eSkillCastConditionOnFightBegin)
                 {
                     skillsOnBegin.push_back(std::pair<int, int>(skillID, skillLevel));
                 }
             }
 		} // END for skilllist
-        OPBattleLog("CharacterData 4 end");
+
         // HQ:type完全没有用到
 		//if (type == 1)
 	    actionController = HeroActionController::getInstance();
@@ -169,9 +180,7 @@ namespace OnePiece {
         
         currentAction = (summoner != NULL) ? DEAD_ACTION1 : IDLE_ACTION;
         actionCauserMyID = -1;
-#if BATTLE_LOG_TEST
-        OPBattleLog("CharacterData 5");
-#endif
+        
 		memset(actionAtt, 0, sizeof(actionAtt));
 		localTick = aiContext.currentTick;
 		startTick = localTick+1;
@@ -179,16 +188,20 @@ namespace OnePiece {
 		HeroActionController::setSkillActionCD(actionAtt, 0);
 		HeroActionController::setSkillSeq(actionAtt, -1);
 		HeroActionController::setSkillID(actionAtt, HeroSkillController::calculateSkillID(aiContext,*this, 0));
-#if BATTLE_LOG_TEST
-        OPBattleLog("CharacterData 6");
-#endif
+        
         m_bEnterEffectAction = false;
         
 		mStationaryDirection = 0;
 		mStationaryX = 0;
 		mStationaryY = 0;
 
+        initCharacterID = getID();
+
         ignoreFreeze = (role == RoleType::kCaptain);
+
+        //setHP(21110000123);
+        //setHPTop(22000000456);
+        
 	}
 
     void CharacterData::initCaptainSeq(std::list<CaptainSeqSkillInfo> &seqList)
@@ -248,7 +261,18 @@ namespace OnePiece {
 
 		return nullptr;
 	}
-
+    int CharacterData::getMarkCountCommon(int markID) {
+        if (HeroActionController::isDeadAction(this->currentAction)) {
+            return 0;
+        }
+            
+        int count = 0;
+        for (auto pMark : markCasts) {
+            if (pMark && pMark->markID == markID)
+                count += pMark->getMarkLevel();
+        }
+        return count;
+    }
 
     bool CharacterData::hasTag(const std::string &tag)
     {
@@ -358,6 +382,69 @@ namespace OnePiece {
         removeSelfFromRivalList(isFromFriendToRival ? theFriends : theRivals);
         addSelfInToTmpRivalList(isFromFriendToRival ? theRivals : theFriends);
     }
+
+
+    void CharacterData::inConfusionEffect() {
+        if (_isInConfusionEffect) {
+            return;
+        }
+        _isInConfusionEffect = true;
+
+
+
+        
+        TeamSide fromSide = teamSide;
+        int fromClusterNum = teamSide == TeamSide::kOur ? aiContext->current_ClusterNumOur : aiContext->current_ClusterNumEnemy ;
+
+        TeamSide toSide = teamSide == TeamSide::kOur ? TeamSide::kEnemy : TeamSide::kOur;
+        int toClusterNum = teamSide == TeamSide::kOur ?  aiContext->current_ClusterNumEnemy : aiContext->current_ClusterNumOur;
+        auto befriendsTo = aiContext->getFriendsForCluster(toSide, toClusterNum);
+        auto berivalsTo = aiContext->getRivalsForCluster(toSide, toClusterNum);
+
+
+        changeFriendRivalSideForCluster(teamSide, fromClusterNum, true, false);
+        if (!isSummon())
+        {
+            changeFriendRivalSideForCluster(fromSide, fromClusterNum, true, true);
+        }
+
+        
+        auto friendsTo = aiContext->getFriendsForCluster(toSide, toClusterNum);
+        auto rivalsTo = aiContext->getRivalsForCluster(toSide, toClusterNum);
+        this->m_pTmpFriends = friendsTo;
+        this->m_pTmpRivals = rivalsTo;
+
+        
+
+        lockTarget(*aiContext);
+
+    }
+    void CharacterData::outConfusionEffect() {
+        if (!_isInConfusionEffect) {
+            return;
+        }
+
+        TeamSide fromSide = teamSide;
+        int fromClusterNum = teamSide == TeamSide::kOur ? aiContext->current_ClusterNumOur : aiContext->current_ClusterNumEnemy;
+        changeFriendRivalSideForCluster(teamSide, fromClusterNum, false, false);
+        if (!isSummon())
+        {
+            changeFriendRivalSideForCluster(fromSide, fromClusterNum, false, true);
+        }
+
+        int toClusterNum = teamSide == TeamSide::kOur ? aiContext->current_ClusterNumEnemy : aiContext->current_ClusterNumOur;
+        TeamSide toSide = teamSide == TeamSide::kOur ?  TeamSide::kOur : TeamSide::kEnemy;
+        auto friendsTo = aiContext->getFriendsForCluster(toSide, toClusterNum);
+        auto rivalsTo = aiContext->getRivalsForCluster(toSide, toClusterNum);
+        this->m_pTmpFriends = friendsTo;
+        this->m_pTmpRivals = rivalsTo;
+
+        _isInConfusionEffect = false;
+
+        lockTarget(*aiContext);
+
+    }
+
 
 	void CharacterData::inCharmEffect()
 	{
@@ -1264,6 +1351,10 @@ namespace OnePiece {
                 if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, EffectType::eEFFECT_NO_SKILL_MARK, 0) > 0)
                     return;
             }
+
+            if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, EffectType::eEFFECT_CONFUSION_EFFECT, 0) > 0)
+                return;
+
             skillInfo->onConditon();
             HeroAttackAction::ForceEnter(*this, *aiContext, -1, skillInfo->skillID, skillInfo->skillLevel, true, 0, skillInfo->skillID == staticData->sk[1]);
         }
@@ -1298,6 +1389,34 @@ namespace OnePiece {
 
     void CharacterData::updateHP(int hp)
     {
+#ifdef OPTOOLS
+        // 一定能在日志里找到相应的log，否则去上层添加
+        auto searchSkillIndex = aiContext->casterFindSkillIndexMap.find(aiContext->currentHPDeltaCasterMyId);
+        if((searchSkillIndex != aiContext->casterFindSkillIndexMap.end()) ){
+            SkillInfoLog* pSkillInfoLog = aiContext->skillInfoLogs[searchSkillIndex->second];
+            if (pSkillInfoLog != nullptr) {
+                auto searchCasterIndex = aiContext->caseterFindIndexMap.find(aiContext->currentHPDeltaCasterMyId);
+                if (pSkillInfoLog->hurtInfoLogs.size() > searchCasterIndex->second) {
+                    HurtInfoLog* pHurtInfoLog = pSkillInfoLog->hurtInfoLogs[searchCasterIndex->second];
+                    if (pHurtInfoLog != nullptr) {
+                        if (IsHurtExec(aiContext->currentHPDeltaCasterId)) {
+                            int subHP = 0;
+                            HurtInfoLog* pHurtInfoLog = pSkillInfoLog->hurtInfoLogs[searchCasterIndex->second];
+                            subHP = this->getHP() - hp;
+                            pHurtInfoLog->hurtHP += subHP;
+                            pSkillInfoLog->skillHurtCount += subHP;
+                        }
+                        else if (IsSummonChildExec(aiContext->currentHPDeltaCasterId)) {
+                            // summon暂时没记录skill伤害日志中，因为不清楚它的作用
+                            SummonInfoLog* pSummonInfoLog = pSkillInfoLog->summonInfoLogs[searchCasterIndex->second];
+                            pSummonInfoLog->hpDelta = hp;
+                        }
+                    }
+                }
+            }
+        }
+
+#endif
         if (hp < 0)
             setHP(0);
         else
@@ -1314,12 +1433,20 @@ namespace OnePiece {
         AIExcuteOnAttrChangeEffect::checkExcute(this, ECharacterAttr::HP); // 13.0
     }
     
-    void CharacterData::updateEnergy(int energy)
+    void CharacterData::updateEnergy(int energy, bool isKill)
     {
+        //512 效果存在时，击杀才能怎加能量
+        if (hasEffect(512)) {
+            if ((!isKill) && energy >= getEnergy()) {
+                return;
+            }
+        }
+
         if (energy > AIDataHelper::getEnergyRecover()[0])
             energy = AIDataHelper::getEnergyRecover()[0];
         else if (energy < 0)
             energy = 0;
+
         setEnergy(energy);
 
         AIExcuteOnAttrChangeEffect::checkExcute(this, ECharacterAttr::ENG);
@@ -1440,9 +1567,12 @@ namespace OnePiece {
 			CharacterData *t = NULL;
             CharacterData *tnormal = NULL; // 最近的非幻象目标
             bool has313 = hasEffect(313); // 优先搜索最近的非幻象目标
+            bool has515 = hasEffect(515);
             for (iter = tmpTargets->begin(); iter != tmpTargets->end(); ++iter)
 			{
                 auto pRival = *iter;
+                if (pRival->myID == this->myID && has515)
+                    continue;
                 if (pRival->myID == this->myID && isTauntExtra)
                     continue;
                 if (!pRival->canBeAttacked(this))
@@ -1661,6 +1791,10 @@ namespace OnePiece {
             if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, EffectType::eEFFECT_NO_SKILL_MARK, 0) > 0)
                 return -1;
         }
+
+        //515
+        if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, EffectType::eEFFECT_CONFUSION_EFFECT, 0) > 0)
+            return -1;
         
         int effectID = HeroActionController::getEffectID(this->actionAtt);
         if(effectID > 0)
@@ -1763,6 +1897,9 @@ namespace OnePiece {
                 return -1;
         }
 
+        if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, EffectType::eEFFECT_CONFUSION_EFFECT, 0) > 0)
+            return -1;
+
         if (currentAction == ATTACK_ACTION && hasTag("nointerruptbyultra"))
             return -1;
 
@@ -1833,6 +1970,9 @@ namespace OnePiece {
             if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, eEFFECT_NO_SKILL_MARK, 0) > 0)
                 return -1;
         }
+
+       if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, eEFFECT_CONFUSION_EFFECT, 0) > 0)
+            return -1;
 
         if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, eEFFECT_NO_UltraSkill, 0) > 0)
             return -1;
@@ -2037,6 +2177,9 @@ namespace OnePiece {
             if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, eEFFECT_NO_SKILL_MARK, 0) > 0)
                 return;
         }
+
+       if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, eEFFECT_CONFUSION_EFFECT, 0) > 0)
+            return ;
 
         if (AIContinuousEffectCaster::check_exert_Special_Effect(*aiContext, *this, eEFFECT_NO_UltraSkill, 0) > 0)
         {
@@ -2332,6 +2475,24 @@ namespace OnePiece {
     }
 
     //cui_获取元素之力增伤减伤
+    // Original native 0x97bf0c. Keep raw getters and Lua get_attr unchanged.
+    int CharacterData::getRealAttriByAttriType(int type)
+    {
+        int percentIndex;
+        switch (type) {
+            case PHY_CRIT_MUL: percentIndex=SWEET_ADD; break;
+            case MAG_CRIT_MUL: percentIndex=RUN_BREAK_ADD; break;
+            case PHY_DE: percentIndex=AMOR_BREAK_ADD; break;
+            case MAG_DE: percentIndex=MAGIC_BREAK_ADD; break;
+            case PHY_PE: percentIndex=AMOR_BREAK_CUT; break;
+            case MAG_PE: percentIndex=MAGIC_BREAK_CUT; break;
+            case PHY_CRIT_MUL_ADD: percentIndex=SWEET_CUT; break;
+            case MAG_CRIT_MUL_ADD: percentIndex=RUN_BREAK_CUT; break;
+            default: return 0;
+        }
+        return aiContext->getPercentAddValue(attributes[percentIndex], attributes[type]);
+    }
+
     int CharacterData::getElementAtkAdd()
     {
         if (atkLabelVec.size() == 0) {
@@ -2470,6 +2631,16 @@ namespace OnePiece {
 
     void CharacterData::onFriendDead(CharacterData *theFriend)
     {
+        //只剩自己一人时，去掉515效果
+        if (hasEffect(eEFFECT_CONFUSION_EFFECT)) {
+            int fromClusterNum = teamSide == TeamSide::kOur ? aiContext->current_ClusterNumOur : aiContext->current_ClusterNumEnemy;
+            int num = aiContext->getSameSideAliveCount(teamSide, fromClusterNum, true,false);
+            if (num <= 1) {
+                AIContinuousEffectCaster::zero_Special_Effect(*aiContext, *this, eEFFECT_CONFUSION_EFFECT);
+
+            }
+        }
+
         if (hasEffect(eEFFECT_CAST_WHEN_FRIEND_DIE) && canBeAttacked(theFriend, true))
         {
             AICastWhenFriendDownEffect::checkExecute(*aiContext, this, theFriend);
@@ -2967,7 +3138,9 @@ namespace OnePiece {
                     ECharacterAttr::FIRE_ADD,
                     ECharacterAttr::FIRE_SUB,
                     ECharacterAttr::NONE_ADD,
-                    ECharacterAttr::NONE_SUB
+                    ECharacterAttr::NONE_SUB,
+                    ECharacterAttr::FINAL_ADD,
+                    ECharacterAttr::FINAL_SUB
 
                 };
                 int inheritRatio = summonConf->attrInheritBase;
@@ -3308,6 +3481,22 @@ namespace OnePiece {
             case NONE_ADD: dst->none_add = val; break;
             case NONE_SUB: dst->none_sub = val; break;
 
+            case FINAL_ADD: dst->final_add= val; break;
+            case FINAL_SUB: dst->final_sub = val; break;
+            case PHYSICS_ADD: dst->physics_add = val; break;
+            case PHYSICS_CUT: dst->physics_cut = val; break;
+            case MAGIC_ADD: dst->magic_add = val; break;
+            case MAGIC_CUT: dst->magic_cut = val; break;
+            case AMOR_BREAK_ADD: dst->amor_break_add = val; break;
+            case AMOR_BREAK_CUT: dst->amor_break_cut = val; break;
+            case MAGIC_BREAK_ADD: dst->magic_break_add = val; break;
+            case MAGIC_BREAK_CUT: dst->magic_break_cut = val; break;
+            case SWEET_ADD: dst->sweet_add = val; break;
+            case SWEET_CUT: dst->sweet_cut = val; break;
+            case RUN_BREAK_ADD: dst->run_break_add = val; break;
+            case RUN_BREAK_CUT: dst->run_break_cut = val; break;
+
+
 			default:
 				break;
 			}
@@ -3378,6 +3567,22 @@ namespace OnePiece {
             case FIRE_SUB: ret = dst->fire_sub; break;
             case NONE_ADD: ret = dst->none_add; break;
             case NONE_SUB: ret = dst->none_sub; break;
+
+            case FINAL_ADD: ret = dst->final_add; break;
+            case FINAL_SUB: ret = dst->final_sub; break;
+            case PHYSICS_ADD: ret = dst->physics_add; break;
+            case PHYSICS_CUT: ret = dst->physics_cut; break;
+            case MAGIC_ADD: ret = dst->magic_add; break;
+            case MAGIC_CUT: ret = dst->magic_cut; break;
+            case AMOR_BREAK_ADD: ret = dst->amor_break_add; break;
+            case AMOR_BREAK_CUT: ret = dst->amor_break_cut; break;
+            case MAGIC_BREAK_ADD: ret = dst->magic_break_add; break;
+            case MAGIC_BREAK_CUT: ret = dst->magic_break_cut; break;
+            case SWEET_ADD: ret = dst->sweet_add; break;
+            case SWEET_CUT: ret = dst->sweet_cut; break;
+            case RUN_BREAK_ADD: ret = dst->run_break_add; break;
+            case RUN_BREAK_CUT: ret = dst->run_break_cut; break;
+
 			default:
 				break;
 			}

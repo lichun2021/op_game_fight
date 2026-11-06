@@ -1,4 +1,4 @@
-﻿//
+//
 //  AIContinuousEffectCaster.h
 //  OnePiece
 //
@@ -183,100 +183,111 @@ namespace OnePiece {
         eEFFECT_FORCE_ATTACK_SELF         = 248,// 强制普攻自己N次
         eEFFECT_CAST_BY_TEAM_HP_RATIO     = 249,// 团队血量百分比（指定阵营）达到条件触发执行
         eEFFECT_CAST_BY_TEAM_DEAD_CNT     = 250,// 场上死亡人数（指定阵营）达到条件触发执行
-        eEFFECT_CHANGE_ATTACK_SPEED       = 251,// 改变攻击速度
-        eEFFECT_BALANCE_ATTR              = 252,// 拉平目标属性(取属性高的值)
-        eEFFECT_TAUNT_EXTRA               = 253,// 新新魅惑(目标只能受到真正敌对阵营的伤害，自己会攻击队友，队友不会攻击被控制的单位)
+eEFFECT_CHANGE_ATTACK_SPEED = 251,// 改变攻击速度
+eEFFECT_BALANCE_ATTR = 252,// 拉平目标属性(取属性高的值)
+eEFFECT_TAUNT_EXTRA = 253,// 新新魅惑(目标只能受到真正敌对阵营的伤害，自己会攻击队友，队友不会攻击被控制的单位)
 
-		eEFFECT_DUR_HIT_CRIT_EFFECT		  = 254, // 持续时间内，如果物理法术伤害击中任何敌人且暴击，则触发一个执行（有触发间隔）
+eEFFECT_DUR_HIT_CRIT_EFFECT = 254, // 持续时间内，如果物理法术伤害击中任何敌人且暴击，则触发一个执行（有触发间隔）
 
-        eEFFECT_ALLOW_NEGTIVE_HEAL        = 255,// 允许受到负治疗值
-        eEFFECT_CAST_WHEN_FRIEND_SUMMON   = 256,// 每当友军制造1个幻象就触发1个执行
-        eEFFECT_CAST_WHEN_FRIEND_DIE      = 257,// 友军发生减员时触发执行
-        eEFFECT_CAST_BY_SPEC_LABEL_HURT   = 258,// 受到特殊标签角色伤害时触发
-        eEFFECT_HURT_DOWN_FROM_MARK       = 259,// 受到指定标记原始伤害减免
-        eEFFECT_CAST_BY_SPEC_EFFECT       = 260,// 受指定效果时触发执行
-        eEFFECT_CANNOT_FIND_TARGET        = 261,// 不能攻击指定阵营的指定角色
-        eEFFECT_CRIT_IF_HIT               = 262,// 若伤害命中则必定暴击
-        eEFFECT_CANNOT_BE_FOUND_BY_SIDE   = 263,// 不能被指定阵营选中
-        eEFFECT_CAST_BY_SPEC_STATE        = 264,// 处于指定状态时触发执行
-        eEFFECT_SHIELD_TRANSFER_HURT      = 265,// 屏障球
-        eEFFECT_STATE_VERTIGO             = 266,// 眩晕（可改变状态）
-		eEFFECT_CREATE_HURT_ADD_VALUE_NEW = 267, // 新增效果：若对目标造成的伤害[是否只取来自施法者某执行id（伤害执行&效果执行）的伤害。]低于X点/X百分比目标血量，则附加理论计算值（无视防御）一定百分比的真实伤害。
-        eEFFECT_DIRECT_KO                 = 268,// 直接致死，无视buff，不触发死亡执行eEFFECT_CAUSE_HURT_BY_LOSE_HP
-        eEFFECT_CAUSE_HURT_BY_CURR_HP     = 269,// 根据目标当前血量百分比造成伤害
-		eEFFECT_CONSUME_HP_ADD_CRUITHURT  = 270, // 消耗自身当前生命值，造成额外真实伤害
-		eEFFECT_ENDURE_HURT_BY_CONDITION  = 271, // 承受伤害小于一定阈值伤害不生效，且触发执行id
-		eEFFECT_FATAL_HURT_DO_EFFECT      = 272,		// 受到致命伤害（本次伤害会造成死亡）时，保留1滴血量不死，触发一个执行
-		eEFFECT_ABSORB_ALLTYPE_HURT_SHIELD = 273, // 吸收所有伤害类型的护盾，护盾的数值根据自身的某项属性
-        eEFFECT_COPY_CREATURE_ANIMATION   = 274,// 暂时变身为目标动画
-        eEFFECT_IGNORE_FIGHT_PARAM_LIMIT  = 275,// 拥有该效果的角色在攻击时计算暴击，闪避，抵抗，吸血，无视公式上下限
-        eEFFECT_CAST_BY_TEAM_LOSE_HP      = 276,// 友军每损失血量达到条件触发执行
-        eEFFECT_CHANGE_ACCU_MAX_TICK      = 277,// 改变蓄力大招的最大蓄力时间
-        eEFFECT_CHANGE_HPADD1_BY_MARK     = 278,// 根据标记层数改变吸血等级
-        eEFFECT_CAST_BY_STATE             = 279,// 处于指定状态时触发执行
-        eEFFECT_FOCUS_TARGET              = 280,// 集火
-        eEFFECT_FREEZE_IN_EFFECT_ACTION   = 281,// 眩晕石化期间暂停并触发执行
-        // 11.0
-        // 282 受到某种类型标签的角色攻击时必定受到暴击
-        // 283 反伤 以未计算减伤前的伤害值作为反伤初始值
-        // 284 根据飞行道具飞行距离触发执行
-        // 285 根据觉醒等级触发执行
-        // 285 判断觉醒等级触发执行
-        // 286 恢复上一次直接攻击造成的一定百分比的伤害(不包括效果执行的持续伤害)
-        // 287 每受到X次攻击，第X次会触发执行
-        // 288 统计目标受到的伤害
-        // 289 释放统计的伤害
-        // 290 攻击背后必定暴击
-        // 291 受到指定ID的角色伤害时，附加额外伤害到初始伤害
-        // 292 使指定效果失效
-        // 293 无法转身，且无法攻击背后的敌人
-        // 294 不能使用含有移动执行的技能
-        // 295 强制抓取，目标无法行动，但可受到移动执行影响
-        // 296 使死亡触发技能无效
-        // 297 不能被指定阵营的单体目标类型选中
-        // 298 免疫295
-        // 299 提升指定技能的等级 提升某个技能的等级（提升的等级数值随本身技能等级成长）
-        // 300 游戏音量渐变
-        // 301 清空288统计的伤害
+eEFFECT_ALLOW_NEGTIVE_HEAL = 255,// 允许受到负治疗值
+eEFFECT_CAST_WHEN_FRIEND_SUMMON = 256,// 每当友军制造1个幻象就触发1个执行
+eEFFECT_CAST_WHEN_FRIEND_DIE = 257,// 友军发生减员时触发执行
+eEFFECT_CAST_BY_SPEC_LABEL_HURT = 258,// 受到特殊标签角色伤害时触发
+eEFFECT_HURT_DOWN_FROM_MARK = 259,// 受到指定标记原始伤害减免
+eEFFECT_CAST_BY_SPEC_EFFECT = 260,// 受指定效果时触发执行
+eEFFECT_CANNOT_FIND_TARGET = 261,// 不能攻击指定阵营的指定角色
+eEFFECT_CRIT_IF_HIT = 262,// 若伤害命中则必定暴击
+eEFFECT_CANNOT_BE_FOUND_BY_SIDE = 263,// 不能被指定阵营选中
+eEFFECT_CAST_BY_SPEC_STATE = 264,// 处于指定状态时触发执行
+eEFFECT_SHIELD_TRANSFER_HURT = 265,// 屏障球
+eEFFECT_STATE_VERTIGO = 266,// 眩晕（可改变状态）
+eEFFECT_CREATE_HURT_ADD_VALUE_NEW = 267, // 新增效果：若对目标造成的伤害[是否只取来自施法者某执行id（伤害执行&效果执行）的伤害。]低于X点/X百分比目标血量，则附加理论计算值（无视防御）一定百分比的真实伤害。
+eEFFECT_DIRECT_KO = 268,// 直接致死，无视buff，不触发死亡执行eEFFECT_CAUSE_HURT_BY_LOSE_HP
+eEFFECT_CAUSE_HURT_BY_CURR_HP = 269,// 根据目标当前血量百分比造成伤害
+eEFFECT_CONSUME_HP_ADD_CRUITHURT = 270, // 消耗自身当前生命值，造成额外真实伤害
+eEFFECT_ENDURE_HURT_BY_CONDITION = 271, // 承受伤害小于一定阈值伤害不生效，且触发执行id
+eEFFECT_FATAL_HURT_DO_EFFECT = 272,		// 受到致命伤害（本次伤害会造成死亡）时，保留1滴血量不死，触发一个执行
+eEFFECT_ABSORB_ALLTYPE_HURT_SHIELD = 273, // 吸收所有伤害类型的护盾，护盾的数值根据自身的某项属性
+eEFFECT_COPY_CREATURE_ANIMATION = 274,// 暂时变身为目标动画
+eEFFECT_IGNORE_FIGHT_PARAM_LIMIT = 275,// 拥有该效果的角色在攻击时计算暴击，闪避，抵抗，吸血，无视公式上下限
+eEFFECT_CAST_BY_TEAM_LOSE_HP = 276,// 友军每损失血量达到条件触发执行
+eEFFECT_CHANGE_ACCU_MAX_TICK = 277,// 改变蓄力大招的最大蓄力时间
+eEFFECT_CHANGE_HPADD1_BY_MARK = 278,// 根据标记层数改变吸血等级
+eEFFECT_CAST_BY_STATE = 279,// 处于指定状态时触发执行
+eEFFECT_FOCUS_TARGET = 280,// 集火
+eEFFECT_FREEZE_IN_EFFECT_ACTION = 281,// 眩晕石化期间暂停并触发执行
+// 11.0
+// 282 受到某种类型标签的角色攻击时必定受到暴击
+// 283 反伤 以未计算减伤前的伤害值作为反伤初始值
+// 284 根据飞行道具飞行距离触发执行
+// 285 根据觉醒等级触发执行
+// 285 判断觉醒等级触发执行
+// 286 恢复上一次直接攻击造成的一定百分比的伤害(不包括效果执行的持续伤害)
+// 287 每受到X次攻击，第X次会触发执行
+// 288 统计目标受到的伤害
+// 289 释放统计的伤害
+// 290 攻击背后必定暴击
+// 291 受到指定ID的角色伤害时，附加额外伤害到初始伤害
+// 292 使指定效果失效
+// 293 无法转身，且无法攻击背后的敌人
+// 294 不能使用含有移动执行的技能
+// 295 强制抓取，目标无法行动，但可受到移动执行影响
+// 296 使死亡触发技能无效
+// 297 不能被指定阵营的单体目标类型选中
+// 298 免疫295
+// 299 提升指定技能的等级 提升某个技能的等级（提升的等级数值随本身技能等级成长）
+// 300 游戏音量渐变
+// 301 清空288统计的伤害
 
-        // 12.0
-        // 302 角色处于丢失状态时触发执行
-        // 303 当角色产生位移（X轴、Y轴）时[移动执行、击飞、击倒]触发执行
-        // 304 被认为是幻象或英雄
+// 12.0
+// 302 角色处于丢失状态时触发执行
+// 303 当角色产生位移（X轴、Y轴）时[移动执行、击飞、击倒]触发执行
+// 304 被认为是幻象或英雄
 
-        // 13.0
-        // 305 不能被指定阵营的技能施法者选中
-        // 306 免疫指定效果执行的效果ID
-        // 307 保护指定效果执行的效果ID
-		// 308 根据指定技能的等级及效果数值区间，决定是否触发效果执行
-        // 309 释放指定类型的技能时触发执行
-        // 310 将一项二级属性转化为另一项二级属性
+// 13.0
+// 305 不能被指定阵营的技能施法者选中
+// 306 免疫指定效果执行的效果ID
+// 307 保护指定效果执行的效果ID
+// 308 根据指定技能的等级及效果数值区间，决定是否触发效果执行
+// 309 释放指定类型的技能时触发执行
+// 310 将一项二级属性转化为另一项二级属性
 
-        // 14.0
-        // 311 判断目标身上是否有指定执行ID
-        // 400 改变目标状态的效果执行，只有在成功改变目标状态（即眩晕石化）后，才会显示绑定的UI特效
+// 14.0
+// 311 判断目标身上是否有指定执行ID
+// 400 改变目标状态的效果执行，只有在成功改变目标状态（即眩晕石化）后，才会显示绑定的UI特效
 
-        // 15.0
-        // 312 同时吸收物理和法术伤害的护盾
+// 15.0
+// 312 同时吸收物理和法术伤害的护盾
 
-		// 25.0
-		eEFFECT_IGNORE_TARGET_BAREPEL = 501, // 效果拥有者攻击时无视目标的物理护甲
-		eEFFECT_IGNORE_TARGET_MAREPEL = 502, // 效果拥有者攻击时无视目标的法术抗性
-		eEFFECT_HURT_ADD_EXTRA        = 503, // 攻击者造成的伤害加成
-		eEFFECT_HURT_SUB_EXTRA		  = 504, // 效果拥有者被攻击时伤害减少
-        
-        // 28.5
-		eEFFECT_HP_LOCK		          = 505, // 生命值锁定
-        eEFFECT_HP_LOST               = 506, // 生命流血
-        eEFFECT_NEW_HURT_LIMIT        = 507, // 伤害上限阈值,单次受到伤害不会超过自身最大生命值的X% 新154，包括真实伤害
+// 25.0
+eEFFECT_IGNORE_TARGET_BAREPEL = 501, // 效果拥有者攻击时无视目标的物理护甲
+eEFFECT_IGNORE_TARGET_MAREPEL = 502, // 效果拥有者攻击时无视目标的法术抗性
+eEFFECT_HURT_ADD_EXTRA = 503, // 攻击者造成的伤害加成
+eEFFECT_HURT_SUB_EXTRA = 504, // 效果拥有者被攻击时伤害减少
 
-        //28.7
-        eEFFECT_HEAL_EXT           = 508, //治疗量溢出时触发
-        eEFFECT_HEAL_SHIELD        = 509, //治疗量溢出护盾
+// 28.5
+eEFFECT_HP_LOCK = 505, // 生命值锁定
+eEFFECT_HP_LOST = 506, // 生命流血
+eEFFECT_NEW_HURT_LIMIT = 507, // 伤害上限阈值,单次受到伤害不会超过自身最大生命值的X% 新154，包括真实伤害
 
-        eEFFECT_HURT_CHANGE_BY_EFFECT   = 510, //身上存在指定标签id士，受到伤害增加
+//28.7
+eEFFECT_HEAL_EXT = 508, //治疗量溢出时触发
+eEFFECT_HEAL_SHIELD = 509, //治疗量溢出护盾
 
-        eEFFECT_SPURTING_HURT = 511,    //灼热，溅射伤害
+eEFFECT_HURT_CHANGE_BY_EFFECT = 510, //身上存在指定标签id士，受到伤害增加
+
+eEFFECT_SPURTING_HURT = 511,    //灼热，溅射伤害
+
+eEFFECT_ATTRY_CHANGE_BY_TIME = 512,   //某一属性值按间隔时间进行变化
+
+eEFFECT_DELETE_AND_HURT = 513,   //把11且满足特殊条件效果驱散掉，同时对这个效果的效果对象造成提升的生命值最大值的伤害，这个伤害不会被任何减伤所减少
+
+
+eEFFECT_DELETE_EFFECT = 514,   //按照要求驱散
+
+eEFFECT_CONFUSION_EFFECT = 515,   //混乱
+
+eEFFECT_DO_EFFECT_BY_MARK_EFFECT = 516,   //统计地方全队标记层数并触发执行
 
         // OP2 海战用
         // 10001 白刃战船只护盾(吸收所有伤害,优先级高-在OP1的护盾前使用)
@@ -962,13 +973,13 @@ namespace OnePiece {
 
     class AISacrificeHurtRecv : public AIInnerEffect {
     public:
-        static bool checkExcute(AIContext &aiContext, CharacterData *source, CharacterData *target, HurtCalcParam &hurtParam, int theSendOriginMyID, int theSendSacrificeID);
+        static bool checkExcute(AIContext &aiContext, CharacterData *source, CharacterData *target, HurtCalcParam &hurtParam, int theSendOriginMyID, int theSendSacrificeID,bool checkMyId);
         AISacrificeHurtRecv(AIContinuousEffectCaster* pParent, CharacterData* pTarget, InnerEffectExec* pExec);
         ~AISacrificeHurtRecv();
         virtual bool onEnter();
         virtual void onExit();
 
-        bool canRecvHurt(int theSendOriginMyID, int theSendSacrificeID, int hurtType, int hurtProperty);
+        bool canRecvHurt(int theSendOriginMyID, int theSendSacrificeID, int hurtType, int hurtProperty,bool checkOriginMyID);
 
         int sacrificeID = 0;
         //int supportHurtType; // 支持的伤害类型 0纯粹 1物理 2法术
@@ -1587,6 +1598,128 @@ namespace OnePiece {
     };
  
     /// ////////////////////////////////////////AIEffect511  end //////////////////////////////////////////////////////////////
+        /// ////////////////////////////////////////AIEffect512  begin //////////////////////////////////////////////////////////////
+
+    class AIEffect512 : public AIInnerEffect {
+    public:
+        AIEffect512(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec);
+        ~AIEffect512();
+
+        bool onEnter() override;
+        void onExit() override;
+        
+    private:
+        int _tickTime = 0;
+    };
+
+    ///////////////////////////////////////////////////AIEffect512  end//////////////////////////////////////////////////////////////////
+            /// ////////////////////////////////////////AIEffect513  begin //////////////////////////////////////////////////////////////
+
+    class AIEffect513 : public AIInnerEffect {
+    public:
+        AIEffect513(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec);
+        ~AIEffect513();
+
+        bool onEnter() override;
+        void onExit() override;
+
+    private:
+        int _tickTime = 0;
+    };
+
+    ///////////////////////////////////////////////////AIEffect513  end//////////////////////////////////////////////////////////////////
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+               /// ////////////////////////////////////////AIEffect514begin //////////////////////////////////////////////////////////////
+
+    class AIEffect514 : public AIInnerEffect {
+    public:
+        AIEffect514(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec);
+        ~AIEffect514();
+
+        //bool sortMark(AIContinuousMarkCaster* a, AIContinuousMarkCaster* b);
+        bool onEnter() override;
+        void onExit() override;
+
+    private:
+      
+    };
+
+    ///////////////////////////////////////////////////AIEffect514  end//////////////////////////////////////////////////////////////////
+
+   /// ////////////////////////////////////////AIEffect516 begin //////////////////////////////////////////////////////////////
+
+    class AIEffect516 : public AIInnerEffect {
+    public:
+        AIEffect516(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec);
+        ~AIEffect516();
+
+        //bool sortMark(AIContinuousMarkCaster* a, AIContinuousMarkCaster* b);
+        bool onEnter() override;
+        void onExit() override;
+
+        void updateMarkNum(int i, int allCount);
+
+    private:
+        int _tickTime = 0;
+        std::unordered_map<int, int> doNumMap;
+    };
+
+    ///////////////////////////////////////////////////AIEffect516  end//////////////////////////////////////////////////////////////////
+
+
+
+    class AIEffect605 : public AIInnerEffect {
+    public:
+        AIEffect605(AIContinuousEffectCaster*, CharacterData*, InnerEffectExec*);
+        ~AIEffect605();
+        bool onEnter() override;
+        void onExit() override;
+        static int onTrigger(AIContext&, CharacterData*);
+        bool onStartTrigger();
+        void castInnerExec();
+    };
+
+    class AIEffect606 : public AIInnerEffect {
+    public:
+        AIEffect606(AIContinuousEffectCaster*, CharacterData*, InnerEffectExec*);
+        ~AIEffect606();
+        bool onEnter() override;
+        void onExit() override;
+        static int onTrigger(AIContext&, CharacterData*);
+        bool onStartTrigger();
+        void castInnerExec();
+    };
+
+
+    class AIEffect517 : public AIInnerEffect {
+    public:
+        AIEffect517(AIContinuousEffectCaster*, CharacterData*, InnerEffectExec*);
+        ~AIEffect517();
+        bool onEnter() override;
+        void onExit() override;
+        static int checkExecute(AIContext&, CharacterData*, CharacterData*, int, int, bool, bool);
+        bool isSameOrigin(CharacterData*, CharacterData*);
+        int doSoulLineHurt(AIContext&, CharacterData*, CharacterData*, int, int, bool);
+    };
+
+
+    class AIEffect518 : public AIInnerEffect {
+    public:
+        AIEffect518(AIContinuousEffectCaster*, CharacterData*, InnerEffectExec*);
+        ~AIEffect518();
+        bool onEnter() override;
+        void onExit() override;
+    };
+
+
+    class AIEffect603 : public AIInnerEffect {
+    public:
+        AIEffect603(AIContinuousEffectCaster*, CharacterData*, InnerEffectExec*);
+        ~AIEffect603();
+        bool onEnter() override;
+        void onExit() override;
+    };
 
     class AIEffectScript : public AIInnerEffect {
     public:
@@ -1597,7 +1730,9 @@ namespace OnePiece {
         void onScheduleTick() override;
     };
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+     
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     namespace EffectHelper {

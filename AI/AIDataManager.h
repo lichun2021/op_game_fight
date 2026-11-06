@@ -1,4 +1,4 @@
-﻿//
+//
 //  AIDataManager.h
 //  OnePiece
 //
@@ -21,6 +21,7 @@ namespace OnePiece {
 		static void unload();
 		static void unload(const char *intfilename);
 		static void setConfigDataPath(const std::string &path);
+        static const std::string& getConfigDataPath() { return _configdata_path; }
 	private:
         static std::unordered_map<const char*, rapidjson::Document*> _cache;
 		static std::string _configdata_path;

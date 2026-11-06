@@ -1,4 +1,4 @@
-﻿//
+//
 //  HeroHurtcalculate.cpp
 //  OnePiece
 //
@@ -65,8 +65,8 @@ namespace OnePiece {
         }
 
         return (HurtType::PHYSICAL_HURT_TYPE == hurtType ?
-            (float)hero->getBACritM() / 100 :
-            (float)hero->getMACritM() / 100);
+            (float)hero->getRealAttriByAttriType(PHY_CRIT_MUL) / 100 :
+            (float)hero->getRealAttriByAttriType(MAG_CRIT_MUL) / 100);
     }
 
     int HeroHurtcalculate::HurtFuncGetBaseAP(HurtType hurtType, CharacterData* hero)
@@ -310,6 +310,7 @@ namespace OnePiece {
     
     void HeroHurtcalculate::HurtFuncHurtTargetNative(AIContext &aiContext, CharacterData *source, CharacterData *target, HurtCalcParam &param, HitResult *outresult)
     {
+
         // 506
         if (!param.isSimulateCalc && !param.isFromHpLost && param.HPDelta != 0) {
             param.HPDelta = AIHpLostEffect::checkExcute(aiContext, source, target, param);
@@ -362,6 +363,7 @@ namespace OnePiece {
             target->attacker = source;
         
         int &HPDelta = param.HPDelta;
+
         
         if (param.markID > 0) {
             // 259
@@ -623,6 +625,16 @@ namespace OnePiece {
 
             //cui_2023_7_7 元素之力增减伤害计算
             HPDelta = getElementHurtDelta(aiContext, source, target, HPDelta);
+
+            //cui_2023_10_10 新增增减伤系统
+            HPDelta = getSpecialChangeHurt(aiContext, source, target, HPDelta);
+
+            // Original native 0x9b7c54..0x9b7c90: after final58/59, before509.
+            if (hurtType == PHYSICAL_HURT_TYPE)
+                HPDelta = aiContext.getFinalValue(source->attributes[PHYSICS_ADD], target->attributes[PHYSICS_CUT], HPDelta);
+            else if (hurtType == MAGICAL_HURT_TYPE)
+                HPDelta = aiContext.getFinalValue(source->attributes[MAGIC_ADD], target->attributes[MAGIC_CUT], HPDelta);
+
 
             //28.7 治疗量溢 互盾吸收伤害 cui_2023_1_19
             if (target->hasEffect(509)) {
@@ -920,9 +932,16 @@ namespace OnePiece {
 					//	if (theExtraHurt)
 					//		theExtraHurt += AIContinuousEffectCaster::check_exert_Special_Effect(aiContext, *target, EffectType::eEFFECT_HURT_SUB_EXTRA, theExtraHurt);
 					//}
-                    
-                    int oldHP = target->getHP();
-                    target->updateHP(target->getHP() - HPDelta - theExtraHurt);
+
+                    // Original HurtFuncHurtTargetNative 0x9b7f94..0x9b7fb0.
+                    HPDelta = AIEffect517::checkExecute(aiContext, target, source, HPDelta,
+                        param.hurtType, param.isSimulateCalc, param.isRawHurt);
+
+                    //int oldHP = target->getHP();
+                    //target->updateHP(target->getHP() - HPDelta - theExtraHurt);
+
+                    int64_t oldHP = target->getHP();
+                    target->updateHP(int64_t(target->getHP()) - int64_t(HPDelta) - int64_t(theExtraHurt));
                     if (aiContext.businessType != BusinessType::CANNON_KING && !param.ignoreHurtLabel) {
                         if (HPDelta != 0) {
                             if (HPDelta > 0 || !AIScriptBinder::getInstance()->isIgnorePositiveHurtValueHitLabelAndStat())
@@ -1249,6 +1268,21 @@ namespace OnePiece {
         return delta;
     }
 
+    int HeroHurtcalculate::getSpecialChangeHurt(AIContext& aiContext, CharacterData* source, CharacterData* target, int HPDelta)
+    {
+        int delta = 0;
+        float ratio = 10000.f;
+        if (HPDelta > 0)
+        {
+            float value = 1 + (source->getFinalAdd() - target->getFinalSub()) / ratio;
+            if (value < 0.2) {
+                value = 0.2;
+            }
+            delta = value * HPDelta;
+
+        }
+        return delta;
+    }
     
 
     float HeroHurtcalculate::calcMissProb(AIContext& aiContext, CharacterData* source, CharacterData* target, int hurtType)
@@ -1939,6 +1973,14 @@ namespace OnePiece {
             isNormalAttack = false;
         }
         
+        // Original ExertHurtNative 0x9ba764..0x9ba8fc:606 before miss/escape.
+        if (source->hasEffect(606) && hurtExec->type != HurtType::HEALING_HURT_TYPE)
+        {
+            const int forcedHit = AIEffect606::onTrigger(aiContext, source);
+            if (forcedHit == 0) isMissed = true;
+            else if (forcedHit == 1) { isMissed = false; isEscaped = false; }
+        }
+
         if (isMissed) //miss
         {
             if (!HeroActionController::isDeadAction(source->currentAction))
@@ -1993,9 +2035,17 @@ namespace OnePiece {
             EffectHelper::checkExcuteFloatEffect(target, eEFFECT_MAGCRIT_MUL_REDUCE_ADD, baseCHP);
             
             //攻击者实际暴击倍数=攻击者暴击倍数-目标暴击倍数减免
-            baseCHP -= (hurtExec->type == HurtType::PHYSICAL_HURT_TYPE ? target->getBACritMAdd() : target->getMACritMAdd()) / 100.0f;
+            baseCHP -= (hurtExec->type == HurtType::PHYSICAL_HURT_TYPE ? target->getRealAttriByAttriType(PHY_CRIT_MUL_ADD) : target->getRealAttriByAttriType(MAG_CRIT_MUL_ADD)) / 100.0f;
         }
         
+        // Original ExertHurtNative 0x9ba9e4..0x9baaec:605 before multiplier clamp.
+        if (source->hasEffect(605) && hurtExec->type != HurtType::HEALING_HURT_TYPE)
+        {
+            const int forcedCritical = AIEffect605::onTrigger(aiContext, source);
+            if (forcedCritical == 0) isNormalAttack = true;
+            else if (forcedCritical == 1) isNormalAttack = false;
+        }
+
         if (baseCHP < 1.0f)
             baseCHP = 1.0f;
         
@@ -2249,17 +2299,17 @@ namespace OnePiece {
 		int baseDP = 0;
 		if (hurtType == HurtType::PHYSICAL_HURT_TYPE)
 		{
-			int targetBARepel = pTarget->getBARepel();
+			int targetBARepel = pTarget->getRealAttriByAttriType(PHY_DE);
 			if (pSource->hasEffect(501))
 				targetBARepel += AIContinuousEffectCaster::check_exert_Special_Effect(*AIContext::getInstance(), *pSource, 501, targetBARepel);
-			baseDP = targetBARepel - pSource->getBABreak();
+			baseDP = targetBARepel - pSource->getRealAttriByAttriType(PHY_PE);
 		}
 		else
 		{
-			int targetMARepel = pTarget->getMARepel();
+			int targetMARepel = pTarget->getRealAttriByAttriType(MAG_DE);
 			if (pSource->hasEffect(502))
 				targetMARepel += AIContinuousEffectCaster::check_exert_Special_Effect(*AIContext::getInstance(), *pSource, 502, targetMARepel);
-			baseDP = targetMARepel - pSource->getMABreak();
+			baseDP = targetMARepel - pSource->getRealAttriByAttriType(MAG_PE);
 		}
 		if (baseDP < 0)
 			baseDP = 0;

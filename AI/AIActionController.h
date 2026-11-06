@@ -69,8 +69,8 @@ namespace OnePiece {
 		//音效暂时走UI
 		static void executeAudio(AIContext& aiContext, int audioID, int skillLevel, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen);
 		//特效暂时走UI
-		static void executeSpecialEffect(AIContext& aiContext, int parentExecID, int seffID, int skillLevel, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen, bool useLogicPos = false);
-        static void executeSpecialEffect(AIContext& aiContext, int parentExecID, int seffID, int skillLevel, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen, bool useLogicPos, int altLinkEffLinkTick);
+		static void executeSpecialEffect(AIContext& aiContext, int parentExecID, int seffID, int skillLevel, int skillID, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen, bool useLogicPos = false);
+        static void executeSpecialEffect(AIContext& aiContext, int parentExecID, int seffID, int skillLevel, int skillID, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen, bool useLogicPos, int altLinkEffLinkTick);
 		//特殊执行暂时走UI
 		static void executeSpecialExec(AIContext& aiContext, int seffID, int skillID, CharacterData* source, AIProjectile* projectile, CharacterData* target, int parentTicklen);
 		//动画暂时走UI

@@ -1,5 +1,6 @@
 #include "fight_alliance.h"
 #include "verifyhelper.h"
+#include "../AI/BattleAttributeSchema.h"
 #include "../json/document.h"
 #include "../jsonx/json.h"
 #include "../AI/AIContext.h"
@@ -101,7 +102,8 @@ std::pair<int, std::pair<std::map<int, int>*, std::vector<std::vector<std::vecto
     char buff[20];
     Json::Reader reader;
     Json::Value root;
-    reader.parse(str, root);
+    if(!reader.parse(str, root)) throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_JSON");
+    validateBattleAttributeSchema(root);
     int seed = root["seed"].asInt();
 
     printf("alliance pve seed: %d\n", seed);
@@ -145,7 +147,7 @@ std::pair<int, std::pair<std::map<int, int>*, std::vector<std::vector<std::vecto
 				captains[cluster] = characterValue;
 				continue;
 			}
-            int *attrList = createAttr(root["teams"][cluster][i]["attr"].toStyledString());
+            int *attrList = createBattleAttr(characterValue);
             if (attrList[11] <= 0) continue;
             std::list<std::pair<int, int> > skillList;
             for (int j = 0; j < root["teams"][cluster][i]["j"].size(); j++){

@@ -69,15 +69,25 @@ AIContinuousTransformCaster::AIContinuousTransformCaster(int transformID, AICont
     _pOwner = target;
     if (target && target->isCaptain())
         ignoreFreeze = true;
+
+   
 }
 
 void AIContinuousTransformCaster::stop()
 {
+
     if (_isStopped) return;
     _isStopped = true;
 
     for (auto aTarget : _affectedTargets)
     {
+        aTarget->staticData = AIDataHelper::getCharacterData(aTarget->initCharacterID);
+        aTarget->setID(aTarget->initCharacterID);
+        if (aTarget->staticData->sk[0])
+        {
+            aTarget->normalSkill.first = aTarget->staticData->sk[0];
+        }
+
         aTarget->exitTransformState();
         if (_aiContext.transformProxy && !HeroActionController::isDeadAction(aTarget->currentAction))
         {
@@ -92,6 +102,7 @@ void AIContinuousTransformCaster::stop()
         }
         //if (_aiContext.transformProxy && !HeroActionController::isDeadAction(aTarget->currentAction))
         //    _aiContext.transformProxy->transformToCreature(_aiContext, aTarget, aTarget->getID());
+
 
         for (auto execID : _staticData->transform.execIDVecWhenEnd)
             AIActionController::executeExec(_aiContext, execID, _skillID, _skillLevel, _pSource, nullptr, aTarget, 0);
@@ -124,8 +135,10 @@ void AIContinuousTransformCaster::update(AIContext& aiContext)
         std::list<CharacterData *> targets;
         AITargetHelper::searchTarget(&ctx, &targets);
         
-        for (auto aTarget : targets)
+        for (auto aTarget : targets) {
             castOnTarget(aiContext, aTarget);
+        }
+            
     } else {
         auto targets = AIActionController::searchTarget(*_pTarget, _pTarget->target, nullptr, aiContext, _staticData->target, _staticData->range[0], _staticData->range[1], _staticData->range[2], _staticData->range[3], _staticData->range[2], _staticData->range[3], nullptr, *_pSource);
         if (targets == nullptr)
@@ -158,6 +171,16 @@ void AIContinuousTransformCaster::castOnTarget(AIContext &aiContext, CharacterDa
         }
     }
     
+    if (_staticData->newTransform) {
+        aTarget->staticData = AIDataHelper::getCharacterData(_staticData->transform.animation);
+        aTarget->setID(aTarget->staticData->id);
+        if (aTarget->staticData->sk[0])
+        {
+            aTarget->normalSkill.first = aTarget->staticData->sk[0];
+        }
+    }
+
+
     if (!_staticData->transform.keepMarks)
         //aTarget->removeMarks();
         aTarget->invalidateMarks();
@@ -170,6 +193,7 @@ void AIContinuousTransformCaster::castOnTarget(AIContext &aiContext, CharacterDa
     
     for (auto execID : _staticData->transform.execIDVecWhenTrigger)
         AIActionController::executeExec(_aiContext, execID, _skillID, _skillLevel, _pSource, nullptr, aTarget, 0);
+
 }
 
 } // namespace OnePiece

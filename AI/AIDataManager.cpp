@@ -1,4 +1,4 @@
-﻿//
+//
 //  AIDataManager.cpp
 //  OnePiece
 //
@@ -7,6 +7,7 @@
 //
 
 #include "AIDataManager.h"
+#include <stdexcept>
 #ifndef ONE_PIECE_SERVER
 #include "cocos2d.h"
 #endif
@@ -55,15 +56,12 @@ namespace OnePiece {
 		}
 
 #ifdef SERVER_VERIFYING
-		char fnbuffer[128];
-		size_t n = sprintf(fnbuffer, PATH, fn);
-		if (_configdata_path.length() > 0)
-		{
-			std::string custom_path = _configdata_path + "%s.txt";
-			n = sprintf(fnbuffer, custom_path.c_str(), fn);
-		}
-		fnbuffer[n] = '\0';
-		FILE * pFile = fopen(fnbuffer, "r");
+        if (_configdata_path.empty() || _configdata_path.front() != '/' || !fn ||
+            std::string(fn).find_first_not_of("_abcdefghijklmnopqrstuvwxyz0123456789") != std::string::npos)
+            throw std::runtime_error("unapproved configuration path");
+        const std::string filename = _configdata_path + fn + ".txt";
+        FILE *pFile = fopen(filename.c_str(), "r");
+        if (!pFile) throw std::runtime_error("configuration file unavailable");
 
 		rapidjson::FileStream f(pFile);
 		rapidjson::Document *doc = new rapidjson::Document();

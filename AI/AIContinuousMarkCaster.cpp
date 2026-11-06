@@ -103,10 +103,10 @@ namespace OnePiece {
                     {
                         AIContinuousMarkCaster *caster = *it;
 
-                        if (caster->isValid())
-                        {
-                            CheckTriggerType5(caster, ac);
-                        }
+if (caster->isValid())
+{
+    CheckTriggerType5(caster, ac);
+}
                     }
                 }
             }
@@ -161,7 +161,7 @@ namespace OnePiece {
         initSkillLevel = skLv;
         _initLevel = mkLv;
 
-		setEffectExecData(AIDataHelper::getMarkEffectExec(staticData->type, _initLevel));//mkLv));
+        setEffectExecData(AIDataHelper::getMarkEffectExec(staticData->type, _initLevel));//mkLv));
 
         this->projectile = projectile;
         this->origin = origin;
@@ -171,8 +171,8 @@ namespace OnePiece {
         localTick = aiContext.currentTick;
         startTick = localTick;
         totalTick = MarkInnerHelper::GetDuration(staticData, skLv, origin);
-       
-		hitContinualNum = 0;
+
+        hitContinualNum = 0;
 
         _maxLevel = MarkInnerHelper::GetMaxLevel(staticData, origin, skLv);
 
@@ -190,6 +190,27 @@ namespace OnePiece {
         }
 
         target->markCasts.push_back(this);
+
+#ifdef OPTOOLS
+        // quanhao.liu 2023/8/22
+        MarkInfoLog* markInfoLog = new MarkInfoLog();
+        markInfoLog->markID = markID;
+        markInfoLog->myID = myID;
+        markInfoLog->currentTick = aiContext.currentTick;
+        markInfoLog->originID = origin->getID();
+        markInfoLog->originName = origin->staticData->name;
+        markInfoLog->targetID = target->getID();
+        markInfoLog->targetName = target->staticData->name;
+        markInfoLog->totalTick = totalTick;
+        markInfoLog->maxLevel = _maxLevel;
+
+        aiContext.incSkillTriggerCount(skillID);
+        SkillInfoLog* skillInfoLog = aiContext.getSkillInfoLog(skillID, skillLevel, myID);
+        skillInfoLog->markInfoLogs.push_back(markInfoLog);
+        aiContext.markInfoLogsMap.insert({ myID, markInfoLog });
+        aiContext.caseterFindIndexMap.insert({ myID, skillInfoLog->markInfoLogs.size() - 1 });
+        aiContext.casterFindSkillIndexMap.insert({ myID, aiContext.getSkillInfoLogsIndex(skillID) });
+#endif
     }
     
     AIContinuousMarkCaster::~AIContinuousMarkCaster()
@@ -805,6 +826,9 @@ namespace OnePiece {
         else if (tmpLevel < 0)
             tmpLevel = 0;
 
+
+        return updateMarkCountForce(tmpLevel, origin, tmpLevel);
+    /*
         _markLevel = tmpLevel;
 
         if (_markLevel <= 0)
@@ -825,6 +849,35 @@ namespace OnePiece {
             removeTriggeredHurtCasts();
 
             if (EMarkEffectTriggerType::eMarkEffectTriggerReachLevel == innerMarkData->triggerType)
+                return excuteEffect(skillLevel, origin);
+        }
+
+        return MarkExcuteResult::EXCUTE_RESULT_NONE;
+     */
+    }
+
+    int AIContinuousMarkCaster::updateMarkCountForce(int tmpLevel, CharacterData* origin, int staticMarkLv) {
+        this->origin = origin;
+        _markLevel = tmpLevel;
+
+        if (_markLevel <= 0)
+        {
+            return MarkExcuteResult::EXCUTE_RESULT_REMOVE_MARK;
+        }
+        else
+        {
+            setEffectExecData(AIDataHelper::getMarkEffectExec(staticData->type, staticMarkLv));
+
+            if (innerMarkData)
+            {
+                updateUIEffect();
+            }
+
+            removeTriggeredEffectCasts();
+
+            removeTriggeredHurtCasts();
+
+            if (innerMarkData && (EMarkEffectTriggerType::eMarkEffectTriggerReachLevel == innerMarkData->triggerType))
                 return excuteEffect(skillLevel, origin);
         }
 

@@ -1,5 +1,6 @@
 #include "fight_shipking.h"
 #include "verifyhelper.h"
+#include "../AI/BattleAttributeSchema.h"
 #include "../json/document.h"
 #include "../jsonx/json.h"
 #include "../AI/AIContext.h"
@@ -47,12 +48,13 @@ int getShipKingMaxAmmo()
 }
 
 int fightShipKingPveVerify(const std::string& str) {
-    shipKingScore = 0;
-    shipKingCurrentWaveCount = 1;
     char buff[20];
     Json::Reader reader;
     Json::Value root;
-    reader.parse(str, root);
+    if(!reader.parse(str, root)) throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_JSON");
+    validateBattleAttributeSchema(root);
+    shipKingScore = 0;
+    shipKingCurrentWaveCount = 1;
     int seed = root["seed"].asInt();
     shipKingActivityID = root["eid"].asInt();
     shipKingAmmoMax = getShipKingMaxAmmo();
@@ -87,7 +89,7 @@ int fightShipKingPveVerify(const std::string& str) {
             //for (int j = 0; j < root["teams"][cluster][i]["attr"].size(); j++){
             //    attrList[j] = root["teams"][cluster][i]["attr"][j].asInt();
             //}
-            int *attrList = createAttr(root["teams"][cluster][i]["attr"].toStyledString());
+            int *attrList = createBattleAttr(root["teams"][cluster][i]);
             if (attrList[11] <= 0) continue;
             std::list<std::pair<int, int> > skillList;
             for (int j = 0; j < root["teams"][cluster][i]["j"].size(); j++){

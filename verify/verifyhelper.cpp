@@ -1,4 +1,8 @@
-﻿#include "verifyhelper.h"
+#include "verifyhelper.h"
+#include "../AI/BattleAttributeSchema.h"
+#include <stdexcept>
+#include <limits>
+#include <cmath>
 #include "../json/document.h"
 #include "../AI/AIContext.h"
 #include "../AI/AIDataManager.h"
@@ -248,23 +252,81 @@ std::vector< OnePiece::RewardCandidateItem*>* RewardCandidateItemFromGkid(int gk
     }
 }
 
+static std::vector<int> decodeBattleAttr(const std::string &str) {
+    Json::Reader reader; Json::Value root;
+    if (!reader.parse(str, root)) throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_JSON");
+    const Json::Value* attrs = &root; std::string schema;
+    if (root.isObject()) {
+        if (root.getMemberNames().size()!=2 || !root["attrSchema"].isString() || root["attrSchema"].asString()!=OnePiece::BattleAttributeSchema::publicSchema() || root["attr"].type()!=Json::arrayValue)
+            throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_envelope");
+        schema=root["attrSchema"].asString(); attrs=&root["attr"];
+    }
+    if (attrs->type()!=Json::arrayValue) throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_array");
+    std::vector<int> input, output; std::string error;
+    for (unsigned int i=0; i<attrs->size(); ++i) {
+        const auto& value=(*attrs)[i];const auto type=value.type();
+        if(type!=Json::intValue&&type!=Json::uintValue&&type!=Json::realValue)
+            throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_int32");
+        const double numeric=value.asDouble();
+        if(!std::isfinite(numeric)||std::floor(numeric)!=numeric||numeric<std::numeric_limits<int>::min()||numeric>std::numeric_limits<int>::max())
+            throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_int32");
+        input.push_back(static_cast<int>(numeric));
+    }
+    if (!OnePiece::BattleAttributeSchema::decode(input,schema,output,error)) throw OnePiece::BattleAttributeSchema::Error(error);
+    return output;
+}
+
 int *createAttr(const std::string &str) {
-    int * array = nullptr;
-    Json::Reader reader;
-    Json::Value json_object;
-    reader.parse(str, json_object);
-    if (json_object.isArray()){
-        int arraySize = json_object.size();
-        if (arraySize < ATT_NUM)
-            arraySize = ATT_NUM;
-        array = new int[arraySize];
-        memset(array, 0, arraySize * sizeof(int));
-        for (int i = 0; i < json_object.size(); ++i){
-            array[i] = (int)json_object[i].asInt();
+    const auto output=decodeBattleAttr(str);
+    int* array=new int[output.size()];std::copy(output.begin(),output.end(),array);return array;
+}
+
+static Json::Value battleAttrPayload(const Json::Value& character) {
+    if(!character.isObject()) throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_actor_object");
+    if (!character.isMember("attrSchema")) return character["attr"];
+    if (!character["attrSchema"].isString()) throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_schema_tag");
+    Json::Value envelope; envelope["attrSchema"]=character["attrSchema"]; envelope["attr"]=character["attr"];
+    return envelope;
+}
+
+int *createBattleAttr(const Json::Value& character) {
+    return createAttr(battleAttrPayload(character).toStyledString());
+}
+
+void validateBattleAttributeSchema(const Json::Value& battle) {
+    if(!battle.isObject()) throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_battle_object");
+    if(!battle["teams"].isArray())throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_teams");
+    for(unsigned int team=0;team<battle["teams"].size();++team) {
+        if(!battle["teams"][team].isArray())throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_team_array");
+        for(unsigned int slot=0;slot<battle["teams"][team].size();++slot)
+            (void)decodeBattleAttr(battleAttrPayload(battle["teams"][team][slot]).toStyledString());
+    }
+}
+
+
+// WWTD uses teams[side][cluster][actor], unlike flat battle families.
+void validateNestedBattleAttributeSchema(const Json::Value& battle) {
+    if(!battle.isObject() || !battle["teams"].isArray() || battle["teams"].size()!=2)
+        throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_two_sides");
+    for(unsigned int side=0;side<battle["teams"].size();++side) {
+        const auto& clusters=battle["teams"][side];
+        if(!clusters.isArray()) throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_cluster_array");
+        for(unsigned int cluster=0;cluster<clusters.size();++cluster) {
+            const auto& actors=clusters[cluster];
+            if(!actors.isArray()) throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_actor_array");
+            for(unsigned int slot=0;slot<actors.size();++slot)
+                (void)decodeBattleAttr(battleAttrPayload(actors[slot]).toStyledString());
         }
     }
+}
 
-    return array;
+// Both original socket handlers execute all three rounds in order.
+// Validate all rounds before the first round can clear or mutate the engine.
+void validateBattleRoundsAttributeSchema(const Json::Value& rounds) {
+    if(!rounds.isArray() || rounds.size()!=3)
+        throw OnePiece::BattleAttributeSchema::Error("attribute_input_requires_three_rounds");
+    for(unsigned int round=0;round<rounds.size();++round)
+        validateBattleAttributeSchema(rounds[round]);
 }
 
 int getFirstClusterCenterX(Json::Value& root) {
@@ -315,7 +377,7 @@ void addCaptains(std::map<int, Json::Value > &captains, int k, int bkey) {
 	for (auto iter = captains.begin(); iter != captains.end(); ++iter) {
 		int cluster = iter->first;
 		auto &&captainValue = iter->second;
-		int *attrList = createAttr(captainValue["attr"].toStyledString());
+		int *attrList = createBattleAttr(captainValue);
 		//if (attrList[11] <= 0)
 		//    continue;
 		std::list<OnePiece::CaptainSeqSkillInfo> seqList;

@@ -1,4 +1,4 @@
-﻿//
+//
 //  AIScriptBinder.cpp
 //  op_game
 //
@@ -7,6 +7,7 @@
 //
 
 #include "AIScriptBinder.hpp"
+#include "AIDataManager.h"
 #include <string>
 #include "lua.hpp"
 #include "lua_cjson.hpp"
@@ -615,14 +616,14 @@ namespace OnePiece {
         std::string platformname = AIPlatformHelper::getPlatformName();
         lua_pushstring(L, platformname.c_str());
         lua_setglobal(L, "g_platform");
+        lua_pushstring(L, AIDataManager::getConfigDataPath().c_str());
+        lua_setglobal(L, "g_op38_config_path");
         
 #ifdef SERVER_VERIFYING
         //const std::string mainLuac = "./lua/ai/main.luac";
         //std::string mainLua = "./lua/ai/main.lua";
         std::string mainLua = AIPlatformHelper::getExecutablePath() + "/lua/ai/main.lua";
-#ifdef __APPLE__
-        mainLua = "../fight_server/lua/ai/main.lua";
-#endif
+// All headless hosts use the resolved executable resource directory.
 
 #ifdef WIN32
         mainLua = "../fight_server/lua/ai/main.lua";

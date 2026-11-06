@@ -1,4 +1,4 @@
-﻿//
+//
 //  AIContext.h
 //  OnePiece
 //
@@ -137,6 +137,101 @@ namespace OnePiece {
         int hurtType2 = 0;
     };
 
+#ifdef OPTOOLS
+    // 2023/08/15, quanhao.liu, op tools
+    class HurtInfoLog
+    {
+    public:
+        int hurtID = 0; // 伤害执行id
+        long currentTick = 0; // 当前tick
+        int myID = 0; // 执行唯一id
+        int originID = 0; // 来源id
+        std::string originName; // 来源名
+        int targetID = 0; // 目标id
+        std::string targetName; // 目标名
+        std::string targetExcludeParams; // 排除目标参数
+        int duration = 0; // 持续时间
+        int totalTick = 0; // 持续tick
+        int freq = 0; // 伤害频率
+        int attackSpeed = 0; // 攻击频率
+        int type = 0; //伤害类型
+        int property = 0; //伤害属性
+        int hpDelta = 0; // 伤害值
+        std::string hitExecs; // 击中执行
+        int hurtHP = 0; // 伤害值
+    };
+    class MovementInfoLog
+    {
+    public:
+        int movementID = 0;
+        long currentTick = 0;
+        int myID = 0;
+        AIContinuousMoveCaster::MoveType moveType;
+    };
+    class ProjectileInfoLog
+    {
+    public:
+        int projectileID = 0;
+        long currentTick = 0;
+        int myID = 0;
+    };
+    class EffectInfoLog
+    {
+    public:
+        int effectID = 0; // 效果执行ID
+        long currentTick = 0;
+        int myID = 0;
+        int originID = 0;
+        std::string originName;
+        int targetID = 0;
+        std::string targetName;
+        int totalTick = 0;
+        int hpDelta = 0;
+        int effectExecId = 0; // 效果ID
+    };
+    class MarkInfoLog
+    {
+    public:
+        int markID = 0;
+        long currentTick = 0;
+        int myID = 0;
+        int originID = 0;
+        std::string originName;
+        int targetID = 0;
+        std::string targetName;
+        int totalTick = 0;
+        int maxLevel = 0;
+    }; 
+    class SummonInfoLog
+    {
+    public:
+        int summonID = 0;
+        long currentTick = 0;
+        int myID = 0;
+        int originID = 0;
+        std::string originName;
+        int targetID = 0;
+        std::string targetName;
+        int totalTick = 0;
+        int hpDelta = 0;
+    };
+    class SkillInfoLog
+    {
+    public:
+        long currentTick = 0;
+        int skillID = 0;
+        int skillLevel = 0;
+        int skillHurtCount = 0;
+        std::string previewstr;
+        std::vector<HurtInfoLog*> hurtInfoLogs;
+        std::vector<MovementInfoLog*> movementInfoLogs;
+        std::vector<ProjectileInfoLog*> projectileInfoLogs;
+        std::vector<EffectInfoLog*> effectInfoLogs;
+        std::vector<MarkInfoLog*> markInfoLogs;
+        std::vector<SummonInfoLog*> summonInfoLogs;
+    };
+#endif
+
 	class AIContext : public cocos2d::Ref
 	{
 	public:
@@ -155,6 +250,26 @@ namespace OnePiece {
         bool pauseAIFalg = false;
         int64_t currentClusterHPTopOur = 0;
         int64_t currentClusterHPTopEnemy = 0;
+
+#ifdef OPTOOLS
+        // 2023/08/15, quanhao.liu, op tools
+        std::unordered_map<int, int> skillCount; // skillId, count
+        std::vector<SkillInfoLog*> skillInfoLogs;
+        std::unordered_map<int, int> skillInfoLogsMap; // skillId, index, 定位skillInfoLogs,O(1)
+        int currentSkillID = 0;
+        int currentExecID = 0;
+        // 用于AICharacterData::updateHP时定位当前上下文的伤害日志
+        int currentHPDeltaCasterMyId = 0;
+        int currentHPDeltaCasterId = 0;
+        std::unordered_map<int, int> casterFindSkillIndexMap; // caster.myID, skillInfoLogsIndex
+        std::unordered_map<int, int> caseterFindIndexMap; // caster.myID, casterIndex
+        std::unordered_map<int, HurtInfoLog*> hurtInfoLogsMap; // myID, 日志指针
+        std::unordered_map<int, MovementInfoLog*> movementInfoLogsMap; // myID, 日志指针
+        std::unordered_map<int, ProjectileInfoLog*> projectileInfoLogsMap; // myID, 日志指针
+        std::unordered_map<int, EffectInfoLog*> effectInfoLogsMap; // myID, 日志指针
+        std::unordered_map<int, MarkInfoLog*> markInfoLogsMap; // myID, 日志指针
+        std::unordered_map<int, SummonInfoLog*> summonInfoLogsMap; // myID, 日志指针
+#endif
 		
 		//int ultraFreeze[] = { 0, 0, 0, 0};//Countdown, exception_characterID, ifFreezeScreen, ifFreezeUltra
 		std::list<int*> ultraFreezeList; //OpCountdown, EffCountdown, myID, myCluster, startGlobalTick, freezeTime, teamSide
@@ -388,6 +503,9 @@ namespace OnePiece {
 
         int getFriendOrRivalAliveCount(TeamSide side, int clusterNum, bool isFriend, bool excludeSummon = false);
 
+        int getSameSideAliveCount(TeamSide mySide, int clusterNum, bool isFriend, bool excludeSummon = false);
+        CharacterDataList getSameSideAliveCharacterList(TeamSide mySide, int clusterNum, bool isFriend, bool excludeSummon = false);
+
         void scheduleNotifyUIEff(int scheduleTick, int parentExecMyID);
         void scheduleExcuteExec(const ExecExcuteInfo &execInfo);
         void scheduleExcute(
@@ -464,6 +582,15 @@ namespace OnePiece {
         void setChapterElementAtkLabel();
         void commonSetAtkLabelFunc(TeamSide side);
 
+#ifdef OPTOOLS
+        int getSkillInfoLogsIndex(int skillID);
+        SkillInfoLog* getSkillInfoLog(int skillID, int skillLevel, int casterMyID);
+        void incSkillTriggerCount(int skillID);
+#endif
+
+        // Recovered from original target ARM64 0x937c00 / 0x937c4c.
+        int getFinalValue(int add, int cut, int value);
+        int getPercentAddValue(int add, int base);
 	private:
 		AIContext();
 		~AIContext();

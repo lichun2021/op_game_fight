@@ -467,6 +467,9 @@ namespace OnePiece {
                     return;
             }
 
+            if (AIContinuousEffectCaster::check_exert_Special_Effect(aiContext, *target, EffectType::eEFFECT_CONFUSION_EFFECT, 0) > 0)
+                return;
+
             if (target->hasTag("ultraskill"))
                 return;
             if (target->canCastUltraSkill())

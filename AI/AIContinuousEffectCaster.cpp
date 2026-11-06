@@ -1,4 +1,4 @@
-﻿//
+//
 //  AIContinuousEffectCaster.cpp
 //  OnePiece
 //
@@ -144,6 +144,27 @@ namespace OnePiece{
         ignoreFreeze = target->isCaptain();
 
 		target->effectCasts.push_back(this);
+
+#ifdef OPTOOLS
+        // quanhao.liu 2023/8/22
+        EffectInfoLog* effectInfoLog = new EffectInfoLog();
+        effectInfoLog->effectID = effectID;
+        effectInfoLog->myID = myID;
+        effectInfoLog->currentTick = aiContext.currentTick;
+        effectInfoLog->originID = origin->getID();
+        effectInfoLog->originName = origin->staticData->name;
+        effectInfoLog->targetID = target->getID();
+        effectInfoLog->targetName = target->staticData->name;
+        effectInfoLog->totalTick = totalTick;
+        effectInfoLog->effectExecId = staticData->ID;
+
+        aiContext.incSkillTriggerCount(skillID);
+        SkillInfoLog* skillInfoLog = aiContext.getSkillInfoLog(skillID, skillLevel, myID);
+        skillInfoLog->effectInfoLogs.push_back(effectInfoLog);
+        aiContext.effectInfoLogsMap.insert({ myID, effectInfoLog });
+        aiContext.caseterFindIndexMap.insert({ myID, skillInfoLog->effectInfoLogs.size() - 1 });
+        aiContext.casterFindSkillIndexMap.insert({ myID, aiContext.getSkillInfoLogsIndex(skillID) });
+#endif
 	}
 
 	AIContinuousEffectCaster::~AIContinuousEffectCaster()
@@ -1083,7 +1104,7 @@ namespace OnePiece{
                         // 同类效果开始/结束特效注册uid时使用角色uid，以便单独清除
                         if (aiContext.seffProxy && IsSpecialUIEffectExec(innerExec.uiEndEffect))
                             aiContext.seffProxy->notify(aiContext, target->myID);
-                        AIActionController::executeSpecialEffect(aiContext, target->myID, innerExec.uiStartEffect, skillLevel, origin, projectile, target, uiEffData->duration);
+                        AIActionController::executeSpecialEffect(aiContext, target->myID, innerExec.uiStartEffect, skillLevel, skillID, origin, projectile, target, uiEffData->duration);
 
                         _schduleUIEffectMap[localTick + uiEffData->duration][pInnerEff->getUID()] = pInnerEff;
                     }
@@ -1288,6 +1309,7 @@ namespace OnePiece{
 				case eEFFECT_FATAL_HURT_DO_EFFECT:
                 case eEFFECT_FOCUS_TARGET:
                 case eEFFECT_FREEZE_IN_EFFECT_ACTION:
+                case eEFFECT_CONFUSION_EFFECT:
                     if (aiCharacter.hasEffect(etype)) return 1;
                     break;
 				case eEFFECT_BAMA_CRIT_NCAST:
@@ -1707,7 +1729,33 @@ namespace OnePiece{
         case eEFFECT_SPURTING_HURT:
             pEff = new AIEffect511(parent, target, exec);
             break;
-
+        case eEFFECT_ATTRY_CHANGE_BY_TIME:
+            pEff = new AIEffect512(parent, target, exec);
+            break;
+        case eEFFECT_DELETE_AND_HURT:
+            pEff = new AIEffect513(parent, target, exec);
+            break;
+        case eEFFECT_DELETE_EFFECT:
+            pEff = new AIEffect514(parent, target, exec);
+            break;
+        case eEFFECT_DO_EFFECT_BY_MARK_EFFECT:
+            pEff = new AIEffect516(parent, target, exec);
+            break;
+        case 605:
+            pEff = new AIEffect605(parent, target, exec);
+            break;
+        case 606:
+            pEff = new AIEffect606(parent, target, exec);
+            break;
+        case 517:
+            pEff = new AIEffect517(parent, target, exec);
+            break;
+        case 518:
+            pEff = new AIEffect518(parent, target, exec);
+            break;
+        case 603:
+            pEff = new AIEffect603(parent, target, exec);
+            break;
         default:
             break;
         }
@@ -1768,7 +1816,7 @@ namespace OnePiece{
                     if (uiEffData) {
                         if (aiContext.seffProxy && IsSpecialUIEffectExec(innerExec->uiStartEffect))
                             aiContext.seffProxy->notify(aiContext, target->myID);
-                        AIActionController::executeSpecialEffect(aiContext, target->myID, innerExec->uiEndEffect, skillLevel, origin, projectile, target, uiEffData->duration);
+                        AIActionController::executeSpecialEffect(aiContext, target->myID, innerExec->uiEndEffect, skillLevel, skillID, origin, projectile, target, uiEffData->duration);
                     }
                 }
             }
@@ -1923,7 +1971,7 @@ namespace OnePiece{
         {
             if (execID <= 0)
                 continue;
-            AIActionController::executeSpecialEffect(aiContext, _uid, execID, skillLevel, origin, projectile, target, ticks);
+            AIActionController::executeSpecialEffect(aiContext, _uid, execID, skillLevel, skillID, origin, projectile, target, ticks);
             parentCaster->addUIEffAffectedCharacter(target->myID);
         }
     }
@@ -2169,6 +2217,7 @@ namespace OnePiece{
         // handle value change
         int realchangevalue = 0;
         int oldHPTop = theTarget->getHPTop();
+
         if (attributeIndex == ECharacterAttr::HP) {
 
 			// 伤害小于一定阈值伤害不生效，且触发执行id 271 clair_wang
@@ -2188,7 +2237,6 @@ namespace OnePiece{
             {
                 theTarget = theTransTarget;
             }
-            
             realchangevalue = EffectHelper::applyHPChange(aiContext, origin, projectile, theTarget, skillID, skillLevel, attributeIndex, theChangeValue, innerExec, parentCaster->markID, parentCaster->effectID, this);
         }
         else {
@@ -2221,6 +2269,8 @@ namespace OnePiece{
 
         if (realchangevalue == 0)
             return 0;
+
+
 
         // handle max hp change
         if (attributeIndex == ECharacterAttr::MAX_HP)
@@ -2273,6 +2323,7 @@ namespace OnePiece{
                     AISpecialEffectLabel::excute(MAX_HP_DECREASE, realchangevalue, aiContext, theTarget); // 上限减少
             }
         }
+
 
         // handle main attr change
         if (innerExec->ID == eEFFECT_ATTR_CONVERT_ADD || innerExec->ID == eEFFECT_ADD_ATTR_ON_ATTR || innerExec->ID == eEFFECT_BALANCE_ATTR)
@@ -2761,6 +2812,10 @@ namespace OnePiece{
             {
                 target->outHalfCharmEffect();
             }
+            else if (innerExec->ID == eEFFECT_CONFUSION_EFFECT)
+            {
+                target->outConfusionEffect();
+            }
         }
 
         AIContinuousEffectCaster::cover_Special_Effect(aiContext, *target, innerExec->ID);
@@ -2785,7 +2840,43 @@ namespace OnePiece{
 		{
 			target->inCharmEffect();
             //isTriggered = true;
-		}
+		} //
+        else if (innerExec->ID == eEFFECT_CONFUSION_EFFECT)
+        {
+            //只有自己时无法添加
+         
+            int fromClusterNum = target->teamSide == TeamSide::kOur ? aiContext.current_ClusterNumOur : aiContext.current_ClusterNumEnemy;
+            int num = aiContext.getSameSideAliveCount(target->teamSide, fromClusterNum, true, false);
+            if (num <= 1) {
+                return false;
+            }
+            
+            
+            if (innerExec->onlySameType == 0 && target->hasEffect(eEFFECT_CONFUSION_EFFECT)) {
+                return false;
+            }
+
+            if (target->hasEffect(eEFFECT_CHARM)) {
+                return false;
+            }
+            if (target->hasTag("tauntprime")) {
+                target->eraseTag("tauntprime");
+            }
+
+            target->outTauntEffect();
+
+            //概率未触发
+            if (aiContext.localRandom->nextInt(0, 100) > _changeValue) {
+                 
+            }
+            else
+            {
+                target->inConfusionEffect();
+            }
+            return true;
+            
+            //isTriggered = true;
+        }
         else if (innerExec->ID == eEFFECT_CHARM_HALF)
         {
             target->inHalfCharmEffect();
@@ -2982,6 +3073,10 @@ namespace OnePiece{
 		}
         else if (innerExec->ID == eEFFECT_BE_TAUNTED)
 		{
+            if (target->hasEffect(eEFFECT_CONFUSION_EFFECT)) {
+                return false;
+                }
+
             if (target->hasTag("tauntprime"))
                 return false;
             
@@ -2991,6 +3086,10 @@ namespace OnePiece{
 		}
         else if (innerExec->ID == eEFFECT_BE_TAUNTED_PRIME)
         {
+            if (target->hasEffect(eEFFECT_CONFUSION_EFFECT)) {
+                return false;
+            }
+
             if (target->hasTag("tauntprime"))
                 return false;
             else if (target->isInTauntEffect())
@@ -3295,18 +3394,27 @@ namespace OnePiece{
 	{
         if (!isValid)
             return;
+
+        auto theTarget = getTargetSafe();
+        if (!theTarget)
+            return;
+
+        if (innerExec->ID == eEFFECT_CONFUSION_EFFECT)
+        {
+            theTarget->outConfusionEffect();
+            return;
+        }
+
 		if (innerExec->exitClear > 0)
 		{
-            auto theTarget = getTargetSafe();
-            if (!theTarget)
-                return;
+
 
             TeamSide target;
 			if (innerExec->ID == eEFFECT_CHARM)
 			{
                 theTarget->outCharmEffect();
-			}
-			else if (innerExec->ID == eEFFECT_BE_TAUNTED)
+
+            }else if (innerExec->ID == eEFFECT_BE_TAUNTED)
 			{
                 if (!theTarget->hasTag("tauntprime"))
                     theTarget->outTauntEffect();
@@ -3605,7 +3713,7 @@ namespace OnePiece{
                 int execID = innerExec->uiSpecialEffects[idx];
                 if (execID <= 0)
                     continue;
-                AIActionController::executeSpecialEffect(aiContext, _uid, execID, skillLevel, origin, projectile, target, ticks);
+                AIActionController::executeSpecialEffect(aiContext, _uid, execID, skillLevel, -1, origin, projectile, target, ticks);
                 parentCaster->addUIEffAffectedCharacter(target->myID);
             }
         };
@@ -3729,7 +3837,7 @@ namespace OnePiece{
             int execID = innerExec->uiSpecialEffects[idx];
             if (execID <= 0)
                 return;
-            AIActionController::executeSpecialEffect(aiContext, _uid, execID, skillLevel, origin, projectile, pTarget, 0);
+            AIActionController::executeSpecialEffect(aiContext, _uid, execID, skillLevel, skillID, origin, projectile, pTarget, 0);
             parentCaster->addUIEffAffectedCharacter(pTarget->myID);
 
             SpecialUIEffectExec* effExec = AIDataHelper::getSpecialUIEffectExec(execID);
@@ -6206,9 +6314,9 @@ namespace OnePiece{
 
     }
 
-    bool AISacrificeHurtRecv::canRecvHurt(int theSendOriginMyID, int theSendSacrificeID, int hurtType, int hurtProperty)
+    bool AISacrificeHurtRecv::canRecvHurt(int theSendOriginMyID, int theSendSacrificeID, int hurtType, int hurtProperty,bool checkOriginMyID)
     {
-        if (theSendOriginMyID != this->_originMyID)
+        if ((theSendOriginMyID != this->_originMyID) && checkOriginMyID)
             return false;
         if (this->sacrificeID == -1)
             return true;
@@ -6223,7 +6331,7 @@ namespace OnePiece{
         return true;
     }
 
-    bool AISacrificeHurtRecv::checkExcute(AIContext &aiContext, CharacterData *source, CharacterData *target, HurtCalcParam &hurtParam, int theSendOriginMyID, int theSendSacrificeID)
+    bool AISacrificeHurtRecv::checkExcute(AIContext &aiContext, CharacterData *source, CharacterData *target, HurtCalcParam &hurtParam, int theSendOriginMyID, int theSendSacrificeID, bool checkMyId)
     {
         auto theRecvIter = target->m_aiEffectMap.find(eEFFECT_SACRIFICE_HURT_RECV);
         if (theRecvIter == target->m_aiEffectMap.end())
@@ -6233,7 +6341,7 @@ namespace OnePiece{
         {
             if (!pRecvEff || pRecvEff->isTempInvalid()) continue;
             auto theRecvEff = (AISacrificeHurtRecv *)(pRecvEff);
-            if (theRecvEff->canRecvHurt(theSendOriginMyID, theSendSacrificeID, hurtParam.hurtType, hurtParam.hurtProperty))
+            if (theRecvEff->canRecvHurt(theSendOriginMyID, theSendSacrificeID, hurtParam.hurtType, hurtParam.hurtProperty, checkMyId))
             {
 //                auto result = HeroHurtcalculate::HurtFuncHurtTargetScript(aiContext, source, target, hurtParam);
                 HitResult result;
@@ -6343,6 +6451,8 @@ namespace OnePiece{
         if (iter == target->m_aiEffectMap.end())
             return hurtParam.HPDelta;
 
+        int realValue = hurtParam.HPDelta;
+        int oldHurt = hurtParam.HPDelta;
         for (auto pEff : iter->second)
         {
             if (!pEff || pEff->isTempInvalid()) continue;
@@ -6350,10 +6460,7 @@ namespace OnePiece{
             int sendHurtValue = theSendEff->getSendHurtDelta(hurtParam);
             if (sendHurtValue)
             {
-                HurtCalcParam sendHurtParam(hurtParam);
-                sendHurtParam.HPDelta = sendHurtValue;
-                sendHurtParam.isFromSacrificeRecv = true;
-                sendHurtParam.ignoreHurtLabel = false;
+
 
                 std::list<CharacterData* > characterList;
                 auto friendList = aiContext.getClusterOrigin(target->teamSide, target->clusterNum);
@@ -6368,17 +6475,35 @@ namespace OnePiece{
 
                 for (auto theIter = characterList.begin(); theIter != characterList.end(); ++theIter)
                 {
+
+
                     auto pCharacter = *theIter;
                     if (pCharacter->myID == target->myID)
                         continue;
-                    bool isRecvSuccess = AISacrificeHurtRecv::checkExcute(aiContext, source, pCharacter, sendHurtParam, theSendEff->_originMyID, theSendEff->sacrificeID);
-                    if (isRecvSuccess)
-                        return (hurtParam.HPDelta - sendHurtValue);
+
+                    HurtCalcParam sendHurtParam(hurtParam);
+                    sendHurtParam.HPDelta = sendHurtValue;
+                    sendHurtParam.isFromSacrificeRecv = true;
+                    sendHurtParam.ignoreHurtLabel = false;
+
+                    bool checkMyId = true;
+                    if ((pEff->innerExec->params.size() > 0) && (pEff->innerExec->params[0] == 1)) {
+                        checkMyId = false;
+                    }
+                    bool isRecvSuccess = AISacrificeHurtRecv::checkExcute(aiContext, source, pCharacter, sendHurtParam, theSendEff->_originMyID, theSendEff->sacrificeID, checkMyId);
+                    if ((pEff->innerExec->params.size() < 2 || (pEff->innerExec->params[1] != 1)) && isRecvSuccess) {
+                        realValue = (hurtParam.HPDelta - sendHurtValue);
+                    }
+
+                    if ((pEff->innerExec->params.size() < 3 || (pEff->innerExec->params[2] != 1)) && isRecvSuccess) {
+                        return realValue;
+                    }
+                        
                 }
             }
         }
 
-        return hurtParam.HPDelta;
+        return realValue;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -9784,6 +9909,543 @@ namespace OnePiece{
     }
   
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+         //                                                            AIEffect512
+  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    AIEffect512::AIEffect512(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec) : AIInnerEffect(theParent, theTarget, theExec)
+    {
+        //CCLOG("1");
+        //CCLOG("2");
+        //}
+    }
+
+    AIEffect512::~AIEffect512()
+    {
+        // onExit();
+        //CCLOG("");
+    }
+
+
+    bool AIEffect512::onEnter()
+    {
+        target->addExtraUpdateFunc(getUID(), [this](AIContext& theAiContext) {
+                _tickTime++;
+                //已执行死亡动作 或无效
+                if (HeroActionController::isDeadAction(target->currentAction) || isTempInvalid()) {
+                    return;
+                }
+
+                if (_tickTime >= innerExec->valueBase) //满足间隔
+                {
+                    _tickTime = 0;
+                    //改变属性
+                    int changeValue = AIInnerEffect::caculateChangeValue();
+                    //int valueBase = innerExec->valueBase;
+                    int curValue = target->getEnergy();
+
+                    changeValue = std::min(changeValue, curValue);
+
+                    switch (innerExec->targetAttribute)
+                    {
+                    case ECharacterAttr::HP:
+                    {
+                        target->updateHP(curValue - changeValue);
+                        break;
+                    }
+                    case ECharacterAttr::ENG:
+                    {
+                        CharacterFunc::ApplyEnergyDelta(target, -changeValue);
+                        //target->ApplyEnergyDelta(-changeValue);
+                        //target->updateEnergy(curValue - changeValue);
+                        break;
+                    }
+                    default:
+                        return;
+                    }
+
+                    //执行飘字
+                    if ((innerExec->limitOnOff != 0) && changeValue > 0)
+                    {
+                        AISpecialEffectLabel::excute(innerExec->limitOnOff, -changeValue, aiContext, target);
+                    }
+
+
+
+                    if (target->getEnergy() == 0) {
+                        //执行特殊效果
+                        if (innerExec->params.size() > 0) {
+                            for (size_t i = 0; i < innerExec->params.size(); i++)
+                            {
+                                AIActionController::executeExec(aiContext, innerExec->params[i], skillID, skillLevel, origin, projectile, target, 0);
+                            }
+                        }
+                        AIContinuousEffectCaster::zero_Special_Effect(aiContext, *target, innerExec->ID);
+
+                    }
+
+                }
+            });
+        if (isDebuffed())
+            return false;
+
+        checkCleanSameTypeExec();
+
+        AIContinuousEffectCaster::startEffectCD(*target, innerExec);
+
+
+        return true;
+    }
+
+    void AIEffect512::onExit()
+    {
+        target->invalidateExtraUpdateFunc(getUID());
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+             //                                                            AIEffect513
+  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    AIEffect513::AIEffect513(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec) : AIInnerEffect(theParent, theTarget, theExec)
+    {
+        //CCLOG("1");
+        //CCLOG("2");
+        //}
+    }
+
+    AIEffect513::~AIEffect513()
+    {
+        // onExit();
+        //CCLOG("");
+    }
+
+
+    bool AIEffect513::onEnter()
+    {
+        if (isDebuffed())
+            return false;
+
+        checkCleanSameTypeExec();
+
+
+        int realChange = 0;
+        int doNum = 0;
+        while (true)
+        {
+            bool isFind = false;
+            for (auto iter = target->m_aiEffectMap.begin(); iter != target->m_aiEffectMap.end(); ++iter) {
+                if (iter->first != 11) {
+                    continue;
+                }
+                std::vector<AIInnerEffect*>& theEffects = iter->second;
+                for (int i = theEffects.size() - 1; i >= 0; i--)
+                {
+                    AIInnerEffect* pEff = theEffects[i];
+                    if (!pEff || pEff->isTempInvalid()) continue;
+                    if (pEff->innerExec->ID == 11 && pEff->innerExec->changeType == 1 && pEff->innerExec->targetAttribute == 1 && pEff->innerExec->valueBase == 1 && pEff->innerExec->changeValue > 0) {
+                        isFind = true;
+                    }
+                    else {
+                        continue;
+                    }
+                    realChange += pEff->innerExec->changeValue;
+                    doNum++;
+                    pEff->parentCaster->removeInnerEffRecord(target->myID, pEff->innerExec->ID);
+                    pEff->onEraseEffect();
+                    theEffects.erase(theEffects.begin() + i);     
+                    
+                }
+
+                if (theEffects.size() <= 0) { //找完了不用再找了
+                    target->m_aiEffectMap.erase(iter);
+                    isFind = false;
+                    break;
+                }                 
+            }
+
+            if (!isFind) {
+                break;
+            }
+        }
+        if (realChange > 0) {
+            int hurt = target->getHPTop() * ((realChange + skillLevel * innerExec->levelup) / 10000.0) * (innerExec->params[0]/10000.0);
+            //伤害加个上限
+            int maxHurt = innerExec->params[1] / 100;
+            hurt = std::min(maxHurt, hurt);
+
+            //触发伤害后执行一个id
+            if (hurt > 0) {
+                int64_t oldHp = target->getHP();
+                int64_t hpChange = std::min(oldHp, int64_t(hurt));
+                target->updateHP(target->getHP() - hpChange);
+                //attrChangeValues[ECharacterAttr::HP] = hpChange;
+                //掉血飘字
+                AISpecialEffectLabel::excute(-hpChange > 0 ? NORMAL_HEAL_LABEL : NORMAL_HURT_LABEL, -hpChange, aiContext, target);
+
+
+            }
+            if (doNum > 0 && innerExec->params[2] != 0) {
+                for (size_t i = 0; i < doNum; i++)
+                {
+                    //执行指定id
+                    AIActionController::executeExec(aiContext, innerExec->params[2], skillID, skillLevel, origin, projectile, target, 0);
+                }
+            }
+        }
+
+ 
+
+        target->addExtraUpdateFunc(getUID(), [this](AIContext& theAiContext) {
+            _tickTime++;
+            //已执行死亡动作 或无效
+            if (HeroActionController::isDeadAction(target->currentAction) || isTempInvalid()) {
+                return;
+            }
+
+            if (_tickTime >= innerExec->valueBase) //满足间隔
+            {
+                _tickTime = 0;
+                //改变属性
+                int changeValue = AIInnerEffect::caculateChangeValue();
+                //int valueBase = innerExec->valueBase;
+                int curValue = target->getEnergy();
+
+                changeValue = std::min(changeValue, curValue);
+
+                switch (innerExec->targetAttribute)
+                {
+                case ECharacterAttr::HP:
+                {
+                    target->updateHP(curValue - changeValue);
+                    break;
+                }
+                case ECharacterAttr::ENG:
+                {
+                    CharacterFunc::ApplyEnergyDelta(target, -changeValue);
+                    //target->ApplyEnergyDelta(-changeValue);
+                    //target->updateEnergy(curValue - changeValue);
+                    break;
+                }
+                default:
+                    return;
+                }
+
+                //执行飘字
+                if ((innerExec->limitOnOff != 0) && changeValue > 0)
+                {
+                    AISpecialEffectLabel::excute(innerExec->limitOnOff, -changeValue, aiContext, target);
+                }
+
+
+
+                if (target->getEnergy() == 0) {
+                    //执行特殊效果
+                    if (innerExec->params.size() > 0) {
+                        for (size_t i = 0; i < innerExec->params.size(); i++)
+                        {
+                            AIActionController::executeExec(aiContext, innerExec->params[i], skillID, skillLevel, origin, projectile, target, 0);
+                        }
+                    }
+                    AIContinuousEffectCaster::zero_Special_Effect(aiContext, *target, innerExec->ID);
+
+                }
+
+            }
+            });
+        if (isDebuffed())
+            return false;
+
+        checkCleanSameTypeExec();
+
+        AIContinuousEffectCaster::startEffectCD(*target, innerExec);
+
+
+        return true;
+    }
+
+    void AIEffect513::onExit()
+    {
+        target->invalidateExtraUpdateFunc(getUID());
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    AIEffect514::AIEffect514(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec) : AIInnerEffect(theParent, theTarget, theExec)
+    {
+        //CCLOG("1");
+        //CCLOG("2");
+        //}
+    }
+
+    AIEffect514::~AIEffect514()
+    {
+        // onExit();
+        //CCLOG("");
+    }
+
+    //bool AIEffect514::sortMark(AIContinuousMarkCaster* a, AIContinuousMarkCaster* b) {
+    //    return false;
+    //}
+    bool AIEffect514::onEnter()
+    {
+        if (isDebuffed())
+            return false;
+
+        checkCleanSameTypeExec();
+
+         //SkillBuffExec* test = AIDataHelper::getSkillBuffExec()
+
+        // changeType  targetAttribute  valueBase
+
+        std::vector<SkillBuffExec*>* dataList = AIDataHelper::getSkillBuffExec(innerExec->changeType, innerExec->targetAttribute, innerExec->valueBase);
+        if (dataList == nullptr) {
+            return false;
+        }
+        bool isDelete = false;
+        int deleteNum = innerExec->changeValue;
+
+        for (size_t i = 0; i < dataList->size(); i++)
+        {
+            SkillBuffExec* oneExec = dataList->at(i);
+
+            if (oneExec->ismark == 0) {
+                //驱散buff
+                for (auto iter = --target->m_aiEffectMap.end(); iter != --target->m_aiEffectMap.begin(); --iter) {
+                    if (iter->first != oneExec->buffid) {
+                        continue;
+                    }
+                    if (deleteNum <= 0) {
+                        break;
+                    }
+
+                    std::vector<AIInnerEffect*>& theEffects = iter->second;
+
+                //   std::sort(theEffects.begin(), theEffects.end(),[](AIInnerEffect* a, AIInnerEffect* b)->bool {
+                //        return a->innerExec->ID - b->innerExec->ID;
+                //        });
+
+                    for (int i = theEffects.size() - 1; i >= 0; i--)
+                    {
+                        if (deleteNum <= 0) {
+                            break;
+                        }
+                        AIInnerEffect* pEff = theEffects[i];
+                        if (!pEff) continue;
+
+                        if (!(oneExec->numerical == 0 || (oneExec->numerical == 1 && pEff->innerExec->changeValue > 0) || (oneExec->numerical == 2 && pEff->innerExec->changeValue < 0))) {
+                            continue;
+                        }
+
+                        // OP38: target AIEffect514 0x95b4ac..0x95b4c8.
+                        // A nonempty exparam protects this execution from a
+                        // lower dispel group; other entries have no role here.
+                        if (!pEff->innerExec->exParams.empty() &&
+                            pEff->innerExec->exParams[0] > oneExec->dispelgroup)
+                        {
+                            continue;
+                        }
+
+                        pEff->parentCaster->removeInnerEffRecord(target->myID, pEff->innerExec->ID);
+                        pEff->onEraseEffect();
+                        theEffects.erase(theEffects.begin() + i);
+                        if (deleteNum != 999) {
+                            deleteNum--;
+                        }
+
+                        if (theEffects.size() <= 0) { //找完了不用再找了
+                            target->m_aiEffectMap.erase(iter);
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            //target->markCasts.sort([](AIContinuousMarkCaster* a, AIContinuousMarkCaster* b) {
+             //   return a->markID - b->markID;
+            //    });
+            //std::sort(target->markCasts.begin(), target->markCasts.end(), [](AIContinuousMarkCaster* a, AIContinuousMarkCaster* b){
+              //  return a->markID - b->markID;
+                //});
+           
+            if (oneExec->ismark == 1) {
+                while (true)
+                {
+                    isDelete = false;
+
+                    for (auto iter = target->markCasts.rbegin(); iter != target->markCasts.rend(); iter++)
+                    {
+                       
+                        auto pMark = *iter;
+                        if (deleteNum == 0) {
+                            break;
+                        }
+                        if ((!pMark) || (pMark->markID != oneExec->buffid))continue;
+
+                        if (deleteNum != 999) {
+                            deleteNum--;
+                        }
+                      
+                        auto deleteIter = find(target->markCasts.begin(), target->markCasts.end(), pMark);
+                        if (deleteIter != target->markCasts.end()) {
+                            auto temp = *deleteIter;
+                            target->markCasts.erase(deleteIter);
+                            delete temp;
+                            isDelete = true;
+                        }
+                        break;
+                       
+                    }
+
+
+                    if (!isDelete) {
+                        break;
+                    }
+                }
+
+            }
+
+
+        }
+
+
+
+
+        return true;
+    }
+
+    void AIEffect514::onExit() {
+
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    AIEffect516::AIEffect516(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec) : AIInnerEffect(theParent, theTarget, theExec)
+    {
+        //CCLOG("1");
+        //CCLOG("2");
+        //}
+    }
+
+    AIEffect516::~AIEffect516()
+    {
+        // onExit();
+        //CCLOG("");
+    }
+
+    //bool AIEffect514::sortMark(AIContinuousMarkCaster* a, AIContinuousMarkCaster* b) {
+    //    return false;
+    //}
+
+    void AIEffect516::updateMarkNum(int i, int allCount)
+    {
+        //显示标记执行
+        if (innerExec->params[i + 1] != 0) {
+            AIContinuousMarkCaster* pMark = target->getMarkCaster(innerExec->params[i + 1]);
+            if (allCount == 0) {
+                if (pMark) {
+                    for (auto iter = target->markCasts.begin(); iter != target->markCasts.end();)
+                    {
+                        auto temp = *iter;
+                        if (temp->markID == pMark->markID) {
+                            delete pMark;
+                            iter = target->markCasts.erase(iter);
+                            break;
+                        }
+                        //(*iter++)->Excute(aiContext);
+                        iter++;
+                    }
+                }
+            }
+            else {
+                AIActionController::executeExec(aiContext, innerExec->params[i + 1], skillID, skillLevel, origin, projectile, target, 0);
+                AIContinuousMarkCaster* pMark = target->getMarkCaster(innerExec->params[i + 1]);
+                if (pMark) {
+                    pMark->updateMarkCountForce(allCount, origin, 1);
+                }
+            }
+        }
+    }
+    bool AIEffect516::onEnter()
+    {
+        for (size_t i = 0; i < innerExec->params.size(); i = i + 5)
+        {
+            doNumMap[i + 3] = innerExec->params[i + 3];
+        }
+
+        target->addExtraUpdateFunc(getUID(), [this](AIContext& theAiContext) {
+            _tickTime++;
+            //已执行死亡动作 或无效
+            if (HeroActionController::isDeadAction(target->currentAction) || isTempInvalid()) {
+                return;
+            }
+
+            if (_tickTime >= innerExec->changeValue) //满足间隔
+            {
+                _tickTime = 0;
+
+                HurtExec* staticData = AIDataHelper::getHurtExec(innerExec->valueBase);
+                auto currentTargets = AIActionController::searchTarget(*origin, target->target, nullptr, aiContext, staticData->target, staticData->filterX1, staticData->filterX2, staticData->filterZ1, staticData->filterZ2, staticData->filterZ1, staticData->filterZ2, &staticData->filterParams, *target, false, skillID);
+                //auto theTargets = AIActionController::searchTarget(*origin, origin->target, nullptr, aiContext, theExec->target, theExec->range[0], theExec->range[1], theExec->range[2], theExec->range[3], theExec->range[2], theExec->range[3], &theExec->targetParams, *origin, false, skillID, 0, skillLevel, nullptr, target, true);
+
+                //对应目标被溅射
+
+                //改变属性
+                for (size_t i = 0; i < innerExec->params.size(); i=i+5)
+                {
+                    int allCount = 0;
+                    for (auto iter = currentTargets->begin(); iter != currentTargets->end(); ++iter)
+                    {
+                        allCount += (*iter)->getMarkCountCommon(innerExec->params[i]);
+                    }
+                    updateMarkNum(i, allCount);
+                    //次数用完
+                    if (doNumMap[i + 3] == 0) { 
+                        continue;
+                    }
+
+
+
+
+
+                    if (allCount < innerExec->params[i + 2]) {
+                        continue;
+                    }
+
+                    AIActionController::executeExec(aiContext, innerExec->params[i + 4], skillID, skillLevel, origin, projectile, target, 0);
+
+                    if (doNumMap[i + 3] != -1) {
+                        doNumMap[i + 3]--;
+                    }
+
+                }
+
+
+
+            }
+            });
+        if (isDebuffed())
+            return false;
+
+        checkCleanSameTypeExec();
+
+        AIContinuousEffectCaster::startEffectCD(*target, innerExec);
+
+
+        return true;
+    }
+
+    void AIEffect516::onExit() {
+        target->invalidateExtraUpdateFunc(getUID());
+        doNumMap.clear();
+        if (!target->hasEffect(516)) {
+            for (size_t i = 0; i < innerExec->params.size(); i = i + 5)
+            {
+                updateMarkNum(i, 0);
+            }
+
+        }
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 
     AIEffectScript::AIEffectScript(AIContinuousEffectCaster* theParent, CharacterData* theTarget, InnerEffectExec* theExec) : AIInnerEffect(theParent, theTarget, theExec)
@@ -9847,6 +10509,10 @@ namespace OnePiece{
 
         int applyNoneHPChange(CharacterData *pTarget, int attributeIndex, int changeValue)
         {
+            if (attributeIndex == ECharacterAttr::ENG && changeValue > 0 && pTarget->hasEffect(512)) {
+                return 0;
+            }
+
             if (attributeIndex == ECharacterAttr::ENG && changeValue > 0 && pTarget->hasTag("energyskill"))
                 return 0;
             if (attributeIndex == ECharacterAttr::ENG && pTarget->hasEffect(315))
@@ -10421,5 +11087,261 @@ namespace OnePiece{
 		}
 
     } // namespace EffectHelper
+
+    // Original ARM64 onTrigger uses wrapping 32-bit counter/tick additions.
+    static int op38Effect605606Add(int a, int b)
+    {
+        return static_cast<int>(static_cast<unsigned int>(a) + static_cast<unsigned int>(b));
+    }
+
+    AIEffect605::AIEffect605(AIContinuousEffectCaster* parent, CharacterData* target, InnerEffectExec* exec)
+        : AIInnerEffect(parent, target, exec) {}
+    AIEffect605::~AIEffect605() {}
+    bool AIEffect605::onEnter()
+    {
+        if (isDebuffed()) return false;
+        checkCleanSameTypeExec();
+        return true;
+    }
+    void AIEffect605::onExit() {}
+
+    bool AIEffect605::onStartTrigger()
+    {
+        if (innerExec->params.at(2) > 0)
+        {
+            const int nextTick = getInnerData("ntick");
+            if (nextTick > 0 && parentCaster->localTick <= nextTick)
+                return false;
+        }
+        return true;
+    }
+
+    void AIEffect605::castInnerExec()
+    {
+        for (size_t i = 3; i < innerExec->params.size(); ++i)
+        {
+            const int execID = innerExec->params[i];
+            if (execID > 0)
+                AIActionController::executeExec(aiContext, execID, skillID, skillLevel,
+                    origin, projectile, target, 0, false, parentCaster->markID, false);
+        }
+    }
+
+    int AIEffect605::onTrigger(AIContext& context, CharacterData* target)
+    {
+        auto group = target->m_aiEffectMap.find(605);
+        if (group == target->m_aiEffectMap.end()) return -1;
+        for (auto base : group->second)
+        {
+            if (!base || base->isTempInvalid() || !base->isValid) continue;
+            auto effect = static_cast<AIEffect605*>(base);
+            if (!effect->onStartTrigger()) continue;
+            effect->castInnerExec();
+            const int cooldown = effect->innerExec->params.at(2);
+            if (cooldown > 0)
+                effect->setInnerData("ntick", op38Effect605606Add(effect->parentCaster->localTick, cooldown));
+            const int countLimit = effect->innerExec->params.at(1);
+            if (countLimit > 0)
+            {
+                const int count = op38Effect605606Add(effect->getInnerData("tcnt"), 1);
+                effect->setInnerData("tcnt", count);
+                if (count >= countLimit)
+                {
+                    effect->setTempInvalid(true);
+                    effect->isValid = false;
+                }
+            }
+            return effect->innerExec->params.at(0);
+        }
+        return -1;
+    }
+
+    AIEffect606::AIEffect606(AIContinuousEffectCaster* parent, CharacterData* target, InnerEffectExec* exec)
+        : AIInnerEffect(parent, target, exec) {}
+    AIEffect606::~AIEffect606() {}
+    bool AIEffect606::onEnter()
+    {
+        if (isDebuffed()) return false;
+        checkCleanSameTypeExec();
+        return true;
+    }
+    void AIEffect606::onExit() {}
+
+    bool AIEffect606::onStartTrigger()
+    {
+        if (innerExec->params.at(2) > 0)
+        {
+            const int nextTick = getInnerData("ntick");
+            if (nextTick > 0 && parentCaster->localTick <= nextTick)
+                return false;
+        }
+        return true;
+    }
+
+    void AIEffect606::castInnerExec()
+    {
+        for (size_t i = 3; i < innerExec->params.size(); ++i)
+        {
+            const int execID = innerExec->params[i];
+            if (execID > 0)
+                AIActionController::executeExec(aiContext, execID, skillID, skillLevel,
+                    origin, projectile, target, 0, false, parentCaster->markID, false);
+        }
+    }
+
+    int AIEffect606::onTrigger(AIContext& context, CharacterData* target)
+    {
+        auto group = target->m_aiEffectMap.find(606);
+        if (group == target->m_aiEffectMap.end()) return -1;
+        for (auto base : group->second)
+        {
+            if (!base || base->isTempInvalid() || !base->isValid) continue;
+            auto effect = static_cast<AIEffect606*>(base);
+            if (!effect->onStartTrigger()) continue;
+            effect->castInnerExec();
+            const int cooldown = effect->innerExec->params.at(2);
+            if (cooldown > 0)
+                effect->setInnerData("ntick", op38Effect605606Add(effect->parentCaster->localTick, cooldown));
+            const int countLimit = effect->innerExec->params.at(1);
+            if (countLimit > 0)
+            {
+                const int count = op38Effect605606Add(effect->getInnerData("tcnt"), 1);
+                effect->setInnerData("tcnt", count);
+                if (count >= countLimit)
+                {
+                    effect->setTempInvalid(true);
+                    effect->isValid = false;
+                }
+            }
+            return effect->innerExec->params.at(0);
+        }
+        return -1;
+    }
+
+
+    // The original scalar FCVTZS saturates at signed 32-bit boundaries.
+    static int op38Effect517FloatToInt(float value)
+    {
+        if (value >= 2147483648.0f) return 2147483647;
+        if (value <= -2147483648.0f) return (-2147483647 - 1);
+        return static_cast<int>(value);
+    }
+    AIEffect517::AIEffect517(AIContinuousEffectCaster* parent, CharacterData* target, InnerEffectExec* exec)
+        : AIInnerEffect(parent, target, exec) {}
+    AIEffect517::~AIEffect517() {}
+    bool AIEffect517::onEnter()
+    {
+        if (isDebuffed()) return false;
+        checkCleanSameTypeExec();
+        return true;
+    }
+    void AIEffect517::onExit() {}
+    bool AIEffect517::isSameOrigin(CharacterData* candidate, CharacterData* source)
+    {
+        auto group = candidate->m_aiEffectMap.find(517);
+        if (group == candidate->m_aiEffectMap.end()) return false;
+        for (auto effect : group->second)
+        {
+            if (!effect || effect->isTempInvalid() || !effect->origin ||
+                HeroActionController::isDeadAction(effect->origin->currentAction)) continue;
+            if (effect->origin->attributes[0] == source->attributes[0]) return true;
+        }
+        return false;
+    }
+    int AIEffect517::checkExecute(AIContext& context, CharacterData* victim, CharacterData* attacker,
+                                  int damage, int hurtType, bool isSimulateCalc, bool isRawHurt)
+    {
+        (void)isSimulateCalc; // The original method does not read this parameter.
+        if (damage < 1 || (static_cast<unsigned int>(hurtType) >= 2 && !isRawHurt)) return damage;
+        auto group = victim->m_aiEffectMap.find(517);
+        if (group == victim->m_aiEffectMap.end()) return damage;
+        std::vector<AIInnerEffect*> expiredOrigins;
+        for (auto base : group->second)
+        {
+            if (!base || base->isTempInvalid()) continue;
+            if (!base->origin || HeroActionController::isDeadAction(base->origin->currentAction))
+                expiredOrigins.push_back(base);
+            else
+            {
+                const int shared = static_cast<AIEffect517*>(base)->doSoulLineHurt(context, victim, attacker, damage, hurtType, true);
+                damage = static_cast<int>(static_cast<unsigned int>(damage) - static_cast<unsigned int>(shared));
+            }
+        }
+        for (auto it = expiredOrigins.rbegin(); it != expiredOrigins.rend(); ++it)
+            AIContinuousEffectCaster::zero_Special_Effect(context, *victim, (*it)->innerExec->ID);
+        return damage;
+    }
+    int AIEffect517::doSoulLineHurt(AIContext& context, CharacterData* victim, CharacterData* attacker,
+                                   int damage, int hurtType, bool simulate)
+    {
+        (void)hurtType;
+        const int cluster = victim->teamSide == TeamSide::kOur ? context.current_ClusterNumOur : context.current_ClusterNumEnemy;
+        auto alive = context.getSameSideAliveCharacterList(victim->teamSide, cluster, true, true);
+        if (alive.size() < 2) return 0;
+        std::list<CharacterData*> sharedTargets;
+        for (auto candidate : alive)
+            if (candidate->attributes[0] != victim->attributes[0] && isSameOrigin(candidate, origin))
+                sharedTargets.push_back(candidate);
+        if (sharedTargets.empty()) return 0;
+        const int growth = static_cast<int>(static_cast<unsigned int>(skillLevel) * static_cast<unsigned int>(innerExec->levelup));
+        const float rate = (static_cast<float>(innerExec->changeValue) / 100.0f + static_cast<float>(growth)) / 100.0f;
+        const float boundedRate = rate < 1.0f ? rate : 1.0f;
+        const int total = op38Effect517FloatToInt(boundedRate * static_cast<float>(damage));
+        const float split = static_cast<float>(op38Effect517FloatToInt(static_cast<float>(total) / static_cast<float>(sharedTargets.size())));
+        for (auto receiver : sharedTargets)
+        {
+            if (victim->hasEffect(505) || victim->hasEffect(246)) continue;
+            float actual = split;
+            if (receiver->hasEffect(179))
+                actual = static_cast<float>(AIFlimsyBuryingEffect::activateFilmsyBuringEffect(receiver, op38Effect517FloatToInt(split), simulate));
+            const int oldHP = receiver->getHP();
+            receiver->updateHP(op38Effect517FloatToInt(static_cast<float>(oldHP) - actual));
+            if (receiver->getHP() == 0)
+            {
+                StatsFunc::AppendHeroHurt(*origin, HurtType::PHYSICAL_HURT_TYPE, oldHP, *receiver);
+                receiver->onHPDelta(static_cast<int>(static_cast<unsigned int>(receiver->getHP()) - static_cast<unsigned int>(oldHP)));
+                HeroHurtcalculate::characterDeadByHurt(context, receiver, attacker, skillID, skillLevel, nullptr, innerExec);
+                actual = static_cast<float>(oldHP);
+            }
+            if (actual != 0.0f)
+                AISpecialEffectLabel::excute(100000, op38Effect517FloatToInt(-actual), context, receiver, false);
+        }
+        return op38Effect517FloatToInt(static_cast<float>(sharedTargets.size()) * split);
+    }
+
+
+    AIEffect518::AIEffect518(AIContinuousEffectCaster* parent, CharacterData* target, InnerEffectExec* exec)
+        : AIInnerEffect(parent, target, exec) {}
+    AIEffect518::~AIEffect518() {}
+    bool AIEffect518::onEnter()
+    {
+        if (isDebuffed()) return false;
+        checkCleanSameTypeExec();
+        return true;
+    }
+    void AIEffect518::onExit() {}
+
+
+    static int op38Effect603Mul(int a, int b)
+    {
+        return static_cast<int>(static_cast<unsigned int>(a) * static_cast<unsigned int>(b));
+    }
+    AIEffect603::AIEffect603(AIContinuousEffectCaster* parent, CharacterData* target, InnerEffectExec* exec)
+        : AIInnerEffect(parent, target, exec) {}
+    AIEffect603::~AIEffect603() {}
+    bool AIEffect603::onEnter()
+    {
+        if (isDebuffed()) return false;
+        checkCleanSameTypeExec();
+        const int drainParameter = innerExec->params.at(0);
+        const int gainParameter = innerExec->params.at(1);
+        const int drain = drainParameter <= 100 ? op38Effect603Mul(target->getEnergy(), drainParameter) / 100 : drainParameter;
+        const int gain = op38Effect603Mul(drain, gainParameter) / 100;
+        const int negativeDrain = static_cast<int>(0u - static_cast<unsigned int>(drain));
+        CharacterFunc::ApplyEnergyDelta(target, negativeDrain);
+        CharacterFunc::ApplyEnergyDelta(origin, gain);
+        return true;
+    }
+    void AIEffect603::onExit() {}
 
 } // namespace OnePiece

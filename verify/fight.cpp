@@ -6,6 +6,7 @@
 #include "../AICallbackServer.h"
 #include "../rankserialization.h"
 #include "verifyhelper.h"
+#include "../AI/BattleAttributeSchema.h"
 #include "../AI/action_hero/HeroSkillController.h"
 
 //void addCaptains(std::map<int, Json::Value > &captains, int k, int bkey) {
@@ -57,7 +58,8 @@ std::pair<int, std::map<int, int>* > fight(const std::string& str, bool useTestS
         char buff[20];
         Json::Reader reader;
         Json::Value root;
-        reader.parse(str, root);
+        if(!reader.parse(str, root)) throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_JSON");
+        validateBattleAttributeSchema(root); // preflight all actors before clearing or mutating the engine
         int seed = root["seed"].asInt();
         if (useTestSeed)
             seed = testSeed;
@@ -92,7 +94,7 @@ std::pair<int, std::map<int, int>* > fight(const std::string& str, bool useTestS
                     captains[cluster] = characterValue;
                     continue;
                 }
-                int *attrList = createAttr(characterValue["attr"].toStyledString());
+                int *attrList = createBattleAttr(characterValue);
                 if (attrList[11] <= 0) continue;
                 std::list<std::pair<int, int> > skillList;
                 for (int j = 0; j < characterValue["j"].size(); j++){
@@ -206,7 +208,9 @@ std::pair<int, std::map<int, int>* > fightDouji(const string& str, const int seq
         char buff[20];
         Json::Reader reader;
         Json::Value root;
-        reader.parse(str, root);
+        if(!reader.parse(str, root)) throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_JSON");
+        validateBattleRoundsAttributeSchema(root);
+        if(seq<0 || seq>=static_cast<int>(root.size())) throw OnePiece::BattleAttributeSchema::Error("attribute_input_round_index_invalid");
         int seed = root[seq]["seed"].asInt();
         //printf(str);
         printf("seed: %d\n", seed);
@@ -223,7 +227,7 @@ std::pair<int, std::map<int, int>* > fightDouji(const string& str, const int seq
         for (int cluster = 0; cluster <= clusterNum; cluster++){
             for (int i = 0; i < root[seq]["teams"][cluster].size(); i++) {
                 auto &&characterValue = root[seq]["teams"][cluster][i];
-                int *attrList = createAttr(characterValue["attr"].toStyledString());
+                int *attrList = createBattleAttr(characterValue);
 
                 if (HPMAP != nullptr) {
                     std::map<int, int>::iterator it = HPMAP->find(attrList[0]);

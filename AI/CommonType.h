@@ -250,6 +250,13 @@ namespace OnePiece
         return exeId >= 130000 && exeId <= 139999;
     }
 
+#ifdef OPTOOLS
+	inline bool IsSummonChildExec(int exeId)
+	{
+		return exeId >= 1100000 && exeId <= 1199990;
+	}
+#endif
+
     struct BodyUIEffectExec
     {
         int execId = 0;
@@ -482,6 +489,8 @@ namespace OnePiece
 		float absoluteZ;               //z修正
         int canSpeedup;                //是否支持加减速 0-不支持  1-支持
         int keepWhenDead;             //目标死后是否保留特效 0-不保留 1-保留
+		int unShow = 0;                  // 不显示
+		int allUnShow = 0;               // 所有不显示
 
 		std::vector<int> delaySound;// 延时执行播放声音
 
@@ -523,6 +532,19 @@ namespace OnePiece
 		int playtime;                 //播放次数
         int type = 0;                 //类型0-wav 1-criware
         int cueId = 0;                //criware的音效索引
+	};
+
+	struct SkillBuffExec
+	{
+		int ID;                  
+		int buffid;                //
+		int numerical;             //正负值处理
+		std::string desc;          //效果描述
+		int maintype;                 //主类型
+		int subtype;                   //副类型
+		int dispelgroup;                 //驱散组
+		int immunegroup = 0;                 //免疫组
+		int ismark = 0;                //标记类型判断
 	};
 
 	struct LabelEffectExec
@@ -873,6 +895,7 @@ namespace OnePiece
         std::vector<int> uiSpecialEffects;
         std::vector<int> bodyEffects;
         std::vector<int> params;
+        std::vector<int> exParams; // Target exparam per execution; semantic support is separate.
         /// 12.0
         int uiStartEffect = 0; // 同类效果开始特效
         int uiEndEffect = 0; // 同类效果结束特效
@@ -1243,6 +1266,7 @@ namespace OnePiece
         int transformType;              // 变身类型
         int rate;                       // 变身触发几率
         int interval;                   // 执行间隔
+		int newTransform;               // 使用新变身 ：更换id 更换静态数据 更换普通攻击id
     };
 
 	struct ComboTrigger
@@ -1733,6 +1757,7 @@ namespace OnePiece
 		const static std::string combo_hit_num;
 		const static std::string combo_trigger;
 		const static std::string convert_attr_list;
+		const static std::string skill_buff;
 #endif
 
 		static int s_aiUpdateTimePerSecond;
@@ -1775,6 +1800,7 @@ namespace OnePiece
         
         static std::string getSummonExecJsonStr(int execId);
 		static SummonExec* getSummonExec(int execId);
+		static std::vector<SkillBuffExec*>* getSkillBuffExec(int typeOne,int typeTwo,int typeThree);
 		
 		static std::string getSummonPropertyJsonStr(int summonId);
         static SummonProperty* getSummonProperty(int summonId);
@@ -1820,6 +1846,8 @@ namespace OnePiece
         static void parseMeleeCombatBattleLog(const std::string &battle_log_str, MeleeCombatBattleInfo *out_info);
         /// 
 
+		static std::vector<int> getTransformEffectConf(int old);
+
 		static void unload();
 
 	private:
@@ -1859,6 +1887,8 @@ namespace OnePiece
         static std::unordered_map<int, std::vector<RewardCandidateItem*>*> _pve_guanqia_character_reward_Map;
         
         static std::vector<ConvertAttrParams> _convertAttrVec;
+
+		static std::unordered_map<std::string, std::vector<SkillBuffExec*>*>_skillBuffExecMap;
 
 		static int energyRecover[2];
 		static int evenPosition[5];

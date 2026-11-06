@@ -98,5 +98,17 @@ local Attr = {
     NONE_SUB = 57,--无属性减伤
     FINAL_ADD = 58,
     FINAL_SUB = 59,
+    PHYSICS_ADD = 60,
+    PHYSICS_CUT = 61,
+    MAGIC_ADD = 62,
+    MAGIC_CUT = 63,
+    AMOR_BREAK_ADD = 64,
+    AMOR_BREAK_CUT = 65,
+    MAGIC_BREAK_ADD = 66,
+    MAGIC_BREAK_CUT = 67,
+    SWEET_ADD = 68,
+    SWEET_CUT = 69,
+    RUN_BREAK_ADD = 70,
+    RUN_BREAK_CUT = 71,
 }
 return Attr

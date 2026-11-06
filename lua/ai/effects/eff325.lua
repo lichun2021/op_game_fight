@@ -126,7 +126,7 @@ local function on_enter(self)
 
     if (limittype == 1 or limittype == 2) and dnlimit > 0 and oldval < dnlimit then
         local dnval = dnlimit - oldval
-        eff:set_innerdata("dnval", dnval)
+        self:set_innerdata("dnval", dnval)
         character:set_attr(idx, dnlimit)
     end
     local diff = character:get_attr(idx) - oldval

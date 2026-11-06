@@ -48,6 +48,7 @@ namespace OnePiece
     const std::string AIDataHelper::combo_hit_num = "_combo_hit_num";
     const std::string AIDataHelper::combo_trigger = "_combo_trigger";
     const std::string AIDataHelper::convert_attr_list = "_convert_attr_list";
+    const std::string AIDataHelper::skill_buff = "_skill_buff";
 #endif // DENA_OP3
 
 	int AIDataHelper::s_aiUpdateTimePerSecond = 20;
@@ -88,6 +89,10 @@ namespace OnePiece
     std::unordered_map<int, std::vector<RewardCandidateItem*>*> AIDataHelper::_pve_guanqia_character_reward_Map;
     
     std::vector<ConvertAttrParams> AIDataHelper::_convertAttrVec;
+
+    
+    std::unordered_map<std::string, std::vector<SkillBuffExec*>*> AIDataHelper::_skillBuffExecMap;
+    
     
 
 	int AIDataHelper::energyRecover[2] = { 0,0 };
@@ -316,6 +321,13 @@ namespace OnePiece
         if (charData.Size() > 22)
         {
             exec->keepWhenDead = charData[22].GetInt();
+        }
+
+        exec->unShow = data["once"].GetInt();
+
+        if (data.HasMember("twice"))
+        {
+            exec->allUnShow = data["twice"].GetInt();
         }
 
 		_specialEffExecMap[execId] = exec;
@@ -1694,9 +1706,9 @@ namespace OnePiece
 		rapidjson::Value& charValue = doc->operator[](idStr.c_str());
         if (charValue.IsNull())
         {
-#if BATTLE_LOG_TEST
-        idStr = "character " + idStr + " not found!";
-        OPBattleLog(idStr);
+#ifdef WIN32
+            idStr = "character " + idStr + " not found!";
+            //CCASSERT(0, idStr.c_str());
 #endif
             return nullptr;
         }
@@ -2442,6 +2454,141 @@ namespace OnePiece
         return nullptr;
     }
 
+
+    std::vector<SkillBuffExec*>* AIDataHelper::getSkillBuffExec(int typeOne, int typeTwo, int typeThree)
+    {
+        std::string realKey = std::to_string(typeOne) + "_" + std::to_string(typeTwo) + "_" + std::to_string(typeThree);
+
+        std::unordered_map<std::string, std::vector<SkillBuffExec*>*>::iterator iter = _skillBuffExecMap.find(realKey);
+        if (iter != _skillBuffExecMap.end())
+            return iter->second;
+
+#ifdef DENA_OP3
+        rapidjson::Document* doc = AIDataManager::getJsonFromFile(AIDataHelper::skill_buff.c_str());
+#else
+        rapidjson::Document* doc = AIDataManager::getJsonFromFile("_skill_buff");
+#endif // DENA_OP3
+        int id = 999; //必须1000开始且连续,且这个表不能太大
+        std::vector<SkillBuffExec*>* SkillBuffExecDatas = new std::vector<SkillBuffExec*>();
+
+        while (true)
+        {
+            id++;
+            if (doc) {
+                std::string idStr = stringWithFormat("%d", id);
+                if (!doc->HasMember(idStr.c_str()))
+                    break;
+                rapidjson::Value& SummonExecData = doc->operator[](idStr.c_str());
+                if (SummonExecData.IsNull())
+                {
+#ifdef WIN32
+                    idStr = "skill_buff " + idStr + " not found!";
+                    //CCASSERT(0, idStr.c_str());
+#endif
+                    break;
+                }
+                bool isFind = false;
+                if (typeOne == 1 && SummonExecData["maintype"].GetInt() == typeTwo) {
+                    isFind = true;
+                }
+                if (typeOne == 2 && SummonExecData["subtype"].GetInt() == typeTwo)
+                {
+                    isFind = true;
+                }
+                if (typeOne == 3 && id == typeTwo)
+                {
+                    isFind = true;
+                }
+                if (!isFind) {
+                    continue;
+                }
+
+                isFind = false;
+                if (typeThree == 1 && SummonExecData["dispelgroup"].GetInt() == 1) {
+                    isFind = true;
+                }
+                if (typeThree == 2 && (SummonExecData["dispelgroup"].GetInt() == 1 || SummonExecData["dispelgroup"].GetInt() == 2)) {
+                    isFind = true;
+                }
+                if (!isFind) {
+                    continue;
+                }
+
+
+                SkillBuffExec* pSkillBuffExec = new SkillBuffExec;
+                pSkillBuffExec->ID = id;
+                pSkillBuffExec->buffid = SummonExecData["buffid"].GetInt();;
+                pSkillBuffExec->numerical = SummonExecData["numerical"].GetInt();
+                pSkillBuffExec->desc = SummonExecData["desc"].GetString();
+                pSkillBuffExec->maintype = SummonExecData["maintype"].GetInt();
+                pSkillBuffExec->subtype = SummonExecData["subtype"].GetInt();
+                pSkillBuffExec->dispelgroup = SummonExecData["dispelgroup"].GetInt();
+                pSkillBuffExec->immunegroup = SummonExecData["immunegroup"].GetInt();
+                pSkillBuffExec->ismark = SummonExecData["ismark"].GetInt();
+
+                SkillBuffExecDatas->push_back(pSkillBuffExec);
+
+            }else{
+                break;
+            }
+            
+
+        }
+
+        if (SkillBuffExecDatas->size() > 0) {
+            _skillBuffExecMap[realKey] = SkillBuffExecDatas;
+            return SkillBuffExecDatas;
+        }
+
+        delete SkillBuffExecDatas;
+        return nullptr;
+    }
+
+    /*
+
+        if (_skillBuffExecMap.find(id) != _skillBuffExecMap.end())
+        {
+            return (SkillBuffExec*)(_skillBuffExecMap.find(id)->second);
+        }
+#ifdef DENA_OP3
+        rapidjson::Document* doc = AIDataManager::getJsonFromFile(AIDataHelper::skill_buff.c_str());
+#else
+        rapidjson::Document* doc = AIDataManager::getJsonFromFile("_skill_buff");
+#endif // DENA_OP3
+
+        if (doc) {
+            std::string idStr = stringWithFormat("%d", id);
+            if (!doc->HasMember(idStr.c_str()))
+                return nullptr;
+            rapidjson::Value& SummonExecData = doc->operator[](idStr.c_str());
+            if (SummonExecData.IsNull())
+            {
+#ifdef WIN32
+                idStr = "skill_buff " + idStr + " not found!";
+                //CCASSERT(0, idStr.c_str());
+#endif
+                return nullptr;
+            }
+
+            SkillBuffExec* pSkillBuffExec = new SkillBuffExec;
+            pSkillBuffExec->ID = SummonExecData["buffid"].GetInt();
+            pSkillBuffExec->buffid = id;
+            pSkillBuffExec->numerical = SummonExecData["numerical"].GetInt();
+            pSkillBuffExec->desc = SummonExecData["desc"].GetString();
+            pSkillBuffExec->maintype = SummonExecData["maintype"].GetInt();
+            pSkillBuffExec->subtype = SummonExecData["subtype"].GetInt();
+            pSkillBuffExec->dispelgroup = SummonExecData["dispelgroup"].GetInt();
+            pSkillBuffExec->immunegroup = SummonExecData["immunegroup"].GetInt();
+            pSkillBuffExec->ismark = SummonExecData["ismark"].GetInt();
+
+            return pSkillBuffExec;
+
+        }
+        */
+
+       // return nullptr;
+   
+    
     std::string AIDataHelper::getSummonExecJsonStr(int execId)
     {
 #ifdef DENA_OP3
@@ -2843,12 +2990,16 @@ namespace OnePiece
         pTransformExec->rate = record["chance"].GetInt();
         pTransformExec->interval = record["interval"].GetInt();
 
+        pTransformExec->newTransform = record["Newtransform"].GetInt();
+
         pTransformExec->transform.ID = transformID;
         pTransformExec->transform.animation = attr["n"].GetInt();
         pTransformExec->transform.keepEffects = attr["keepEffect"].GetInt();
         pTransformExec->transform.keepMarks = attr["keepMark"].GetInt();
         pTransformExec->transform.keepHP = attr["keepHp"].GetInt();
         pTransformExec->transform.duration = attr["time"].GetInt();
+
+
 
         auto& array1 = attr["trigger1"];
         for (int i = 0; i < array1.Size(); i++)
@@ -2906,7 +3057,7 @@ namespace OnePiece
             if (!doc->HasMember(idStr.c_str()))
                 return nullptr;
 			rapidjson::Value& effectData = doc->operator[](idStr.c_str());
-            if (effectData.IsNull())
+            if (!effectData.IsObject())
             {
 #ifdef WIN32
                 idStr = "effect_exec " + idStr + " not found!";
@@ -2933,6 +3084,7 @@ namespace OnePiece
             auto& ui_special_effects = effectData["ui_effect"];
             auto& bodyEffects = effectData["body_effect"];
             auto& params = effectData["param"];
+            auto& exParams = effectData["exparam"];
             auto& uiStartEndEffects = effectData["uise"];
 
             const int exec_len = 19;
@@ -3009,6 +3161,18 @@ namespace OnePiece
                     {
                         effectExec->execs[idx].params[paramIdx] = param[paramIdx].GetInt();
                     }
+                }
+
+                // Target exparam[index] is retained as integer data. Its
+                // business consumers and algorithms require separate validation.
+                if (exParams.IsArray() && idx < exParams.Size())
+                {
+                    auto& values = exParams[idx];
+                    if (!values.IsArray())
+                        continue;
+                    effectExec->execs[idx].exParams.resize(values.Size());
+                    for (int valueIdx = 0; valueIdx < values.Size(); ++valueIdx)
+                        effectExec->execs[idx].exParams[valueIdx] = values[valueIdx].GetInt();
                 }
 
                 /// 12.0
@@ -3496,6 +3660,30 @@ namespace OnePiece
         return AIDataHelper::_convertAttrVec;
     }
 
+    std::vector<int> AIDataHelper::getTransformEffectConf(int old) {
+        std::vector<int> skillIDs;
+        rapidjson::Document* doc = AIDataManager::getJsonFromFile("_skill_transform_effect");
+        
+        if (!doc)
+        return skillIDs;
+        std::string idStr = stringWithFormat("%d", old);
+        if (!doc->HasMember(idStr.c_str()))
+            return skillIDs;
+        rapidjson::Value& data = doc->operator[](idStr.c_str());
+        if (data.IsNull())
+            return skillIDs;
+
+        rapidjson::Value& array = data["conf"];
+
+        int count = array.Size();
+        for (int idx = 0; idx < count; ++idx)
+        {
+            skillIDs.push_back(array[idx].GetInt());
+        }
+        return skillIDs;
+
+    }
+
     void AIDataHelper::parseMeleeCombatBattleLog(const std::string &battle_log_str, MeleeCombatBattleInfo *out_info)
     {
         if (!out_info)
@@ -3649,7 +3837,6 @@ namespace OnePiece
 		deleteAllMapItem(_logicEffMap);
 		deleteAllMapItem(_specialExecMap);
         deleteAllMapItem(_bodyEffectExecMap);
-
 		deleteAllMapItem(_pve_guanqia_character_Map);
 		deleteAllMapItem(_rewardCandidateMap);
 		deleteAllMapItem(_pve_guanqia_character_reward_Map);
@@ -3660,6 +3847,7 @@ namespace OnePiece
         deleteAllMapItem(_summonExecMap);
         deleteAllMapItem(_summonPropertyMap);
         deleteAllMapItem(_transformExecMap);
+        deleteAllMapItem(_skillBuffExecMap);
         
         for (auto iter = _markLevelMap.begin(); iter != _markLevelMap.end(); ++iter)
         {

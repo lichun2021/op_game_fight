@@ -1,58 +1,10 @@
 -- main
 
-local theplatform = g_platform
-local theconfigpath
-if theplatform == "IOS" or theplatform == "ANDROID" then
-    g_mainfilepath = nil
-    theconfigpath = "src/config_data/"
-elseif theplatform == "SERVER" then
-    theconfigpath = "/data/op_game_server/bin/export/client_data_cn/"
-    local themainfilepath = g_mainfilepath
-    local srcpos = string.find( themainfilepath, "/lua/ai/main.lua" )
-    local srcpath = string.sub( themainfilepath, 1, srcpos )
-    -- print(srcpath)
-    local theluapath = srcpath .. "lua/"
-    package.path = theluapath.."ai/?.lua"
-elseif theplatform == "MACOS_SERVER" then
-    theconfigpath = "data/config_data/"
-    local theluapath = "../fight_server/lua/"
-    local libs = {
-        theluapath.."ai/",
-        theluapath.."luasocket/",
-        theluapath.."mobdebug/?.lua"
-    }
-    package.path = table.concat(libs, "?.lua;")
-    require("mobdebug").start()
-elseif theplatform == "WIN32_SERVER" then
-    theconfigpath = "data/config_data/"
-    local theluapath = "../fight_server/lua/"
-    local libs = {
-        theluapath.."ai/",
-        theluapath.."luasocket/",
-        theluapath.."mobdebug/?.lua"
-    }
-    package.path = table.concat(libs, "?.lua;")
-    require("mobdebug").start()
-else
-    local themainfilepath = g_mainfilepath
-    print(themainfilepath)
-    local srcpos = string.find( themainfilepath, "/lua/ai/main.luac" )
-    if not srcpos then
-        srcpos = string.find( themainfilepath, "/lua/ai/main.lua" )
-    end
-    -- print(srcpos)
-    local srcpath = string.sub( themainfilepath, 1, srcpos )
-    print(srcpath)
-    theconfigpath = srcpath .. "config_data/"
-    local theluapath = srcpath .. "lua/"
-    local libs = {
-        theluapath.."ai/",
-        theluapath.."luasocket/",
-        theluapath.."mobdebug/?.lua"
-    }
-    package.path = table.concat(libs, "?.lua;")
-    require("mobdebug").start()
-end
+assert(g_platform == "SERVER", "local adapter requires Linux SERVER")
+assert(type(g_op38_config_path) == "string" and string.sub(g_op38_config_path, 1, 1) == "/", "missing verified config path")
+local theconfigpath = g_op38_config_path
+local srcpath = assert(string.match(g_mainfilepath, "^(.*)/lua/ai/main%.lua$"), "unexpected main path")
+package.path = srcpath .. "/lua/ai/?.lua"
 -- print(package.path)
 
 g_hostconfig = require "hostscriptconfig"

@@ -1,5 +1,6 @@
 #include "fight_huiyi.h"
 #include "verifyhelper.h"
+#include "../AI/BattleAttributeSchema.h"
 #include "../json/document.h"
 #include "../jsonx/json.h"
 #include "../AI/AIContext.h"
@@ -97,7 +98,8 @@ WWFightResult fightWWTD(const std::string& str) {
         char buff[20];
         Json::Reader reader;
         Json::Value root;
-        reader.parse(str, root);
+        if(!reader.parse(str, root)) throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_JSON");
+        validateNestedBattleAttributeSchema(root);
         int seed = root["seed"].asInt();
         //printf(str);
         printf("seed: %d\n", seed);
@@ -132,7 +134,7 @@ WWFightResult fightWWTD(const std::string& str) {
                     //for (int j = 0; j < heroValue["attr"].size(); j++){
                     //    attrList[j] = heroValue["attr"][j].asInt();
                     //}
-                    int *attrList = createAttr(heroValue["attr"].toStyledString());
+                    int *attrList = createBattleAttr(heroValue);
                     if (attrList[11] <= 0) continue;
                     std::list<std::pair<int, int> > skillList;
                     for (int j = 0; j < heroValue["j"].size(); j++){
@@ -342,7 +344,8 @@ std::pair<int, std::vector<std::vector<std::vector<std::vector<int> > > > >  fig
     char buff[20];
     Json::Reader reader;
     Json::Value root;
-    reader.parse(str, root);
+    if(!reader.parse(str, root)) throw OnePiece::BattleAttributeSchema::Error("attribute_input_invalid_JSON");
+    validateBattleAttributeSchema(root);
     int seed = root["seed"].asInt();
     printf("seed: %d\n", seed);
     int k = root["k"].asInt();
@@ -379,7 +382,7 @@ std::pair<int, std::vector<std::vector<std::vector<std::vector<int> > > > >  fig
 				continue;
 			}
 
-            int *attrList = createAttr(root["teams"][heroindex][i]["attr"].toStyledString());
+            int *attrList = createBattleAttr(characterValue);
             attrList[29] = 0;
             attrList[30] = 0;
 
@@ -435,7 +438,7 @@ std::pair<int, std::vector<std::vector<std::vector<std::vector<int> > > > >  fig
             //for (int j = 0; j < root["teams"][monsterindex][i]["attr"].size(); j++){
             //    attrList[j] = root["teams"][monsterindex][i]["attr"][j].asInt();
             //}
-            int *attrList = createAttr(root["teams"][monsterindex][i]["attr"].toStyledString());
+            int *attrList = createBattleAttr(characterValue);
             attrList[29] = 0;
             attrList[30] = 0;
 

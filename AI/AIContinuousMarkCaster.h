@@ -126,6 +126,8 @@ namespace OnePiece {
         void updateUIEffect();
         void removeUIEffect();
 
+        int updateMarkCountForce(int markNum,CharacterData* origin,int staticMarkLv);
+
 		bool isTriggerParam(TriggerType triggerType, int paramA, int paramB, int paramC = kInvalidParamID);
 
         void removeTriggeredEffectCasts();

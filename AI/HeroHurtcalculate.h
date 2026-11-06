@@ -172,6 +172,8 @@ namespace OnePiece {
 
         static int getElementHurtDelta(AIContext& aiContext, CharacterData* source, CharacterData* target, int HPDelta = 0);
 
+        static int getSpecialChangeHurt(AIContext& aiContext, CharacterData* source, CharacterData* target, int HPDelta = 0);
+
         static bool isTargetInSpecialAction(CharacterData *target);
         static void handleNormalHurtResult(AIContext &aiContext, CharacterData *source, CharacterData *target, HurtExec *hurtExec);
         static void handleKnockBackHurtResult(AIContext &aiContext, CharacterData *source, CharacterData *target, HurtExec *hurtExec, bool isRandomDirection);

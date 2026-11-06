@@ -211,7 +211,7 @@ void ProjectileForBouncing::update(AIContext& aiContext)
                         theAltLinkEffTick = 1;
                 }
 
-                AIActionController::executeSpecialEffect(aiContext, 0, aBouncingExecId, skillLevel, origin, nullptr, target, 0, false, theAltLinkEffTick);
+                AIActionController::executeSpecialEffect(aiContext, 0, aBouncingExecId, skillLevel, skillID, origin, nullptr, target, 0, false, theAltLinkEffTick);
             }
             else if (aBouncingExecId > 0)
             {
@@ -274,7 +274,7 @@ void ProjectileForBouncing::update(AIContext& aiContext)
                         theAltLinkEffTick = 1;
                 }
 
-                AIActionController::executeSpecialEffect(aiContext, 0, aBouncingExecId, skillLevel, target, nullptr, nextBouncingTarget, 0, false, theAltLinkEffTick);
+                AIActionController::executeSpecialEffect(aiContext, 0, aBouncingExecId, skillLevel, skillID, target, nullptr, nextBouncingTarget, 0, false, theAltLinkEffTick);
             }
             else if (aBouncingExecId > 0)
             {

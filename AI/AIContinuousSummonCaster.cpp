@@ -42,6 +42,23 @@ namespace OnePiece{
         initSummonExecTodo(pSummonExec->execs[innerExecIndex]);
         
         origin->summonCasts.push_back(this);
+
+#ifdef OPTOOLS
+        // quanhao.liu 2023/8/22
+        SummonInfoLog* summonInfoLog = new SummonInfoLog();
+        summonInfoLog->summonID = _summonID;
+        summonInfoLog->myID = myID;
+        summonInfoLog->currentTick = aiContext.currentTick;
+        summonInfoLog->originID = origin->getID();
+        summonInfoLog->originName = origin->staticData->name;
+
+       aiContext.incSkillTriggerCount(aiContext.currentSkillID);
+       SkillInfoLog* skillInfoLog = aiContext.getSkillInfoLog(aiContext.currentSkillID, skillLevel, myID);
+       skillInfoLog->summonInfoLogs.push_back(summonInfoLog);
+       aiContext.summonInfoLogsMap.insert({ myID, summonInfoLog });
+       aiContext.caseterFindIndexMap.insert({ myID, skillInfoLog->summonInfoLogs.size() - 1 });
+       aiContext.casterFindSkillIndexMap.insert({ myID, aiContext.getSkillInfoLogsIndex(aiContext.currentSkillID) });
+#endif
     }
     
     AIContinuousSummonCaster::~AIContinuousSummonCaster()
@@ -83,6 +100,12 @@ namespace OnePiece{
     
     void AIContinuousSummonCaster::Excute(AIContext& aiContext)
     {
+#ifdef OPTOOLS
+        int tmpCurrentHPDeltaCasterMyId = aiContext.currentHPDeltaCasterMyId;
+        aiContext.currentHPDeltaCasterMyId = this->myID;
+        int tmpCurrentHPDeltaCasterId = aiContext.currentHPDeltaCasterId;
+        aiContext.currentHPDeltaCasterId = this->_summonID;
+#endif
 		AINode::update(aiContext);
 		
 		int deltaTick = localTick - startTick - 1;
@@ -193,7 +216,7 @@ namespace OnePiece{
                 if (pCharacter->getFakeSummonType() != 3 && AIContinuousEffectCaster::check_exert_Special_Effect(aiContext, *origin, eEFFECT_TAUNT_EXTRA, 0) > 0 && origin->hasTag("charm253includesummon"))
                 {
                     pCharacter->addTag("summonincharm253");
-                    AIActionController::executeSpecialEffect(aiContext, pCharacter->myID, 61575, skillLevel, pCharacter, nullptr, pCharacter, totalTick - deltaTick);
+                    AIActionController::executeSpecialEffect(aiContext, pCharacter->myID, 61575, skillLevel, -1, pCharacter, nullptr, pCharacter, totalTick - deltaTick);
                 }
 
                 for (auto &&skillPair : pCharacter->skillList)
@@ -308,6 +331,10 @@ namespace OnePiece{
                     summonDoExec(execID);
             }
         }
+#ifdef OPTOOLS
+        aiContext.currentHPDeltaCasterMyId = tmpCurrentHPDeltaCasterMyId;
+        aiContext.currentHPDeltaCasterId = tmpCurrentHPDeltaCasterId;
+#endif
     }
 
     /*

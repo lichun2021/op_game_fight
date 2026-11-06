@@ -1,4 +1,4 @@
-﻿//
+//
 //  AICharacterData.h
 //  OnePiece
 //
@@ -18,7 +18,7 @@
 
 #include "AINode.h"
 
-#define ATT_NUM 58
+#define ATT_NUM 72
 #define ACTION_ATT_NUM 16
 
 #define STATIC_SETGET_ATT(getX,setX,i) \
@@ -164,7 +164,21 @@ namespace OnePiece {
         NONE_SUB = 57,//无属性减伤
      
 
-        ATT_LEN = 58// 属性数量
+        FINAL_ADD = 58,//最终伤害加成
+        FINAL_SUB = 59,//最终伤害减免
+        PHYSICS_ADD = 60, // Target Lua/native index.
+        PHYSICS_CUT = 61, // Target Lua/native index.
+        MAGIC_ADD = 62, // Target Lua/native index.
+        MAGIC_CUT = 63, // Target Lua/native index.
+        AMOR_BREAK_ADD = 64, // Target Lua/native index.
+        AMOR_BREAK_CUT = 65, // Target Lua/native index.
+        MAGIC_BREAK_ADD = 66, // Target Lua/native index.
+        MAGIC_BREAK_CUT = 67, // Target Lua/native index.
+        SWEET_ADD = 68, // Target Lua/native index.
+        SWEET_CUT = 69, // Target Lua/native index.
+        RUN_BREAK_ADD = 70, // Target Lua/native index.
+        RUN_BREAK_CUT = 71, // Target Lua/native index.
+        ATT_LEN = 72// 属性数量
     };
     
     
@@ -301,6 +315,22 @@ namespace OnePiece {
         int  fire_sub = 0;//火属性减伤
         int  none_add = 0;//无属性增伤
         int none_sub = 0;//无属性减伤
+
+        int final_add = 0; //最终增伤
+        int final_sub = 0; //最终减伤
+        int physics_add = 0; // Target native storage index 60.
+        int physics_cut = 0; // Target native storage index 61.
+        int magic_add = 0; // Target native storage index 62.
+        int magic_cut = 0; // Target native storage index 63.
+        int amor_break_add = 0; // Target native storage index 64.
+        int amor_break_cut = 0; // Target native storage index 65.
+        int magic_break_add = 0; // Target native storage index 66.
+        int magic_break_cut = 0; // Target native storage index 67.
+        int sweet_add = 0; // Target native storage index 68.
+        int sweet_cut = 0; // Target native storage index 69.
+        int run_break_add = 0; // Target native storage index 70.
+        int run_break_cut = 0; // Target native storage index 71.
+
 	};
 
     class CharacterData;
@@ -430,6 +460,10 @@ namespace OnePiece {
         void outHalfCharmEffect();
         bool isInHalfCharmEffect() { return _isInHalfCharmEffect; }
 
+        void inConfusionEffect();
+        void outConfusionEffect();
+        bool isInConfusionEffect() { return _isInConfusionEffect; }
+
 		void inTauntEffect();
 		void outTauntEffect();
 		bool m_bInTauntEffect;
@@ -504,6 +538,8 @@ namespace OnePiece {
 
         int killerUID = -1;
         int killerSkillID = -1;
+
+        int initCharacterID = 0;
 
 		bool mAttackConfirmedTarget = false;// 是否已确认攻击对象（适用于查找目标类型：41）
         
@@ -634,7 +670,11 @@ namespace OnePiece {
         bool _isInDuel = false;
         CharacterData *_duelTarget = nullptr;
 
+        bool _isInConfusionEffect = false; // 是否处于混乱状态 cui_2023_11_12
+
         int _restoredByEffectCount = 0; // 被效果执行中的复活效果复活的次数
+
+
 
         CharacterDataList _tmpFriends;
         CharacterDataList _tmpRivals;
@@ -665,6 +705,11 @@ namespace OnePiece {
         CharacterDataList _summons;
         ///
 
+        bool _isHpDown = false;   //当前血量是否超过21亿
+        bool _isTopHpDown = false; //血量上限是否超过21亿
+        //int _curHpDown = 0;    //当前血量超21亿时，此值用于存储大于21 / 1000 取余的部分 
+        //int _curTopHpDown = 0; //血量上限超21亿时，此值用于存储大于21 / 1000 取余的部分 
+
     public:
         SummonProperty *summonProperty = nullptr;
         bool isSummonActive;
@@ -683,6 +728,7 @@ namespace OnePiece {
         void initCaptainSeq(std::list<CaptainSeqSkillInfo> &seqList);
         AIContinuousEffectCaster *getEffectCaster(int casterMyId);
 		AIContinuousMarkCaster	 *getMarkCaster(int casterMyId);
+        int getMarkCountCommon(int markID);
         bool hasTag(const std::string &tag);
         void addTag(const std::string &tag);
         void eraseTag(const std::string &tag);
@@ -718,6 +764,7 @@ namespace OnePiece {
         void onEvent(const std::string &name, CharacterData *pusher);
         void onFriendDead(CharacterData *theFriend);
         void onFriendSummonTimedOut(CharacterData *theFriendSummon);
+
 		
 		// clair_wang
 		// 受到暴击后触发
@@ -814,18 +861,20 @@ namespace OnePiece {
         SETGET_ATT(getLightAdd, setLightAdd, ECharacterAttr::LIGHT_ADD);//光属性增伤
         SETGET_ATT(getLightSub, setLightSub, ECharacterAttr::LIGHT_SUB);//光属性减伤
         SETGET_ATT(getDarkAdd, setDarkAdd, ECharacterAttr::DARK_ADD);//暗属性增伤
-        SETGET_ATT(getDarkSub, getDarkSub, ECharacterAttr::DARK_SUB);//暗属性减伤
+        SETGET_ATT(getDarkSub, setDarkSub, ECharacterAttr::DARK_SUB);//暗属性减伤
         SETGET_ATT(getWaterAdd, setWaterAdd, ECharacterAttr::WATER_ADD);//水属性增伤
-        SETGET_ATT(getWaterSub, getWaterSub, ECharacterAttr::WATER_SUB);//水属性减伤
+        SETGET_ATT(getWaterSub, setWaterSub, ECharacterAttr::WATER_SUB);//水属性减伤
         SETGET_ATT(getPosionAdd, setPosionAdd, ECharacterAttr::POISON_ADD);//毒属性增伤
-        SETGET_ATT(getPosionSub, getPosionSub, ECharacterAttr::POISON_SUB);//毒属性减伤
+        SETGET_ATT(getPosionSub, setPosionSub, ECharacterAttr::POISON_SUB);//毒属性减伤
         SETGET_ATT(getElectticAdd, setElectticAdd, ECharacterAttr::ELECTRIC_ADD);//雷属性增伤
-        SETGET_ATT(getElectticSub, getElectticSub, ECharacterAttr::ELECTRIC_SUB);//雷属性减伤
+        SETGET_ATT(getElectticSub, setElectticSub, ECharacterAttr::ELECTRIC_SUB);//雷属性减伤
         SETGET_ATT(getFireAdd, setFireAdd, ECharacterAttr::FIRE_ADD);//火属性增伤
-        SETGET_ATT(getFireSub, getFireSub, ECharacterAttr::FIRE_SUB);//火属性减伤
+        SETGET_ATT(getFireSub, setFireSub, ECharacterAttr::FIRE_SUB);//火属性减伤
         SETGET_ATT(getNoneAdd, setNoneAdd, ECharacterAttr::NONE_ADD);//无属性增伤
-        SETGET_ATT(getNoneSub, getNoneSub, ECharacterAttr::NONE_SUB);//无属性减伤
-
+        SETGET_ATT(getNoneSub, setNoneSub, ECharacterAttr::NONE_SUB);//无属性减伤
+        SETGET_ATT(getFinalAdd, setFinalAdd, ECharacterAttr::FINAL_ADD);
+        SETGET_ATT(getFinalSub, setFinalSub, ECharacterAttr::FINAL_SUB);
+        int getRealAttriByAttriType(int type);
 
         
         class AttributeData {
@@ -835,10 +884,58 @@ namespace OnePiece {
             int originValue;
             int currentValue;
         };
+        /*
+        int64_t getHP() {
+            if (!_isHpDown) {
+                return attributes[ECharacterAttr::HP];
+            }
+            else
+            {
+                return int64_t(attributes[ECharacterAttr::HP]) * 1000 + int64_t(_curHpDown);
+            }
+            
+        }
+        void setHP(int64_t hp) { 
+            if (hp >= 2100000000) {
+                _isHpDown = true;
+                _curHpDown = hp % 1000;
+                attributes[ECharacterAttr::HP] = hp / 1000;
+            }
+            else
+            {
+                _isHpDown = false;
+                attributes[ECharacterAttr::HP] = hp;
+                _curHpDown = 0;
+            }
+        }
+
+        int64_t getHPTop() { 
+            if (!_isTopHpDown) {
+                return attributes[ECharacterAttr::MAX_HP];
+            }
+            else
+            {
+                return  int64_t (attributes[ECharacterAttr::MAX_HP]) * 1000 + int64_t(_curTopHpDown);
+            }
+        }
+        void setHPTop(int64_t hp) { 
+            if (hp >= 2100000000) {
+                _isTopHpDown = true;
+                _curTopHpDown = hp % 1000;
+                attributes[ECharacterAttr::MAX_HP] = hp / 1000;
+            }
+            else
+            {
+                _isTopHpDown = false;
+                attributes[ECharacterAttr::MAX_HP] = hp;
+                _curTopHpDown = 0;
+            }
+        }
+        */
         
         
         void updateHP(int hp);
-        void updateEnergy(int energy);
+        void updateEnergy(int energy,bool isKill = false);
 
         void onScriptSetX(int x);
         void onScriptSetY(int y);

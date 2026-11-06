@@ -13,6 +13,7 @@
 #include "AI/AIDataManager.h"
 #include "AI/BattleLog.h"
 #include "AI/AICharacterData.h"
+#include "AI/BattleAttributeSchema.h"
 #include "AI/action_hero/HeroActionController.h"
 #include "jsonx/reader.h"
 #include "ServerVerifyHelper.h"
@@ -1080,6 +1081,12 @@ bool server::distribute(int sock,socketbuff *the_buff)
             OPBattleLogReset();
 #endif
 		}
+		catch (const OnePiece::BattleAttributeSchema::Error& e)
+		{
+			cout << "attribute schema rejected: " << e.what() << endl;
+			shutdown(sock, SHUT_RDWR);
+			return false;
+		}
 		catch (readException& e)
 		{
 			cout<<"read err"<<endl;
@@ -1148,7 +1155,7 @@ bool server::run(void)
 		ev.data.fd=listenfd;
 		epoll_ctl(epfd,EPOLL_CTL_ADD,listenfd,&ev);
 	
-		if (bind(listenfd,(sockaddr *)&serveraddr,sizeof(serveraddr)) < 0)
+		if (::bind(listenfd,(sockaddr *)&serveraddr,sizeof(serveraddr)) < 0)
 		{
 			perror("bind error");
 			return false;

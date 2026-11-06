@@ -66,7 +66,6 @@ namespace OnePiece {
 			outfream_ai.close();
 		//}
 #endif
-
 		
 		if (aiCharacter.k < 1)
 		{
@@ -285,9 +284,15 @@ namespace OnePiece {
     void HeroActionController::actionSelector(CharacterData& aiCharacter, AIContext& aiContext)
     {
         if (AIScriptBinder::getInstance()->isActionSelectorByLua(aiContext.getLuaState()))
+        {
             luahelper_actioncontroller_action_selector(aiContext.getLuaState(), &aiCharacter);
+        }
+            
         else
+        {
             actionSelectorNative(aiCharacter, aiContext);
+        }
+
     }
 
 	void HeroActionController::actionSelectorNative(CharacterData& aiCharacter, AIContext& aiContext)
@@ -374,6 +379,7 @@ namespace OnePiece {
         else
             HeroSkillController::pickSkill(aiCharacter, aiContext, &skilldata);
 
+
 		if (skilldata.skillIDIndex == -1 && skilldata.specialSkillID <= 0) {
 			HeroIdleAction::Enter(aiCharacter, aiContext, 1, IDLE_ACTION, aiCharacter);
 			return;
@@ -383,11 +389,21 @@ namespace OnePiece {
 		int no_skill = AIContinuousEffectCaster::check_exert_Special_Effect(aiContext, aiCharacter, EffectType::eEFFECT_NO_SKILL_MARK, 0); // 114
 		int only_skill1 = AIContinuousEffectCaster::check_exert_Special_Effect(aiContext, aiCharacter, EffectType::eEFFECT_ONLY_FINAL_SKILL, 0); // 124
         bool ignore_silence = HeroSkillController::isTargetIgnoreSilenceBySkillIndex(aiContext, &aiCharacter, skilldata.skillIDIndex);
+
+        int be_confusion = AIContinuousEffectCaster::check_exert_Special_Effect(aiContext, aiCharacter, eEFFECT_CONFUSION_EFFECT, 0);
+
+
         if (ignore_silence)
         {
             no_attack = 0;
             no_skill = 0;
         }
+
+        if(be_confusion){
+          no_skill = 1;
+        }
+
+
 
 		if (skilldata.skillIDIndex == 0) //normal attack
 		{
@@ -404,6 +420,7 @@ namespace OnePiece {
 					{
 						setSkillSeq(aiCharacter.actionAtt, skilldata.attackSeqIndex);
 					}
+
 
 					setSkillID(aiCharacter.actionAtt, HeroSkillController::calculateSkillID(aiContext, aiCharacter, skilldata.attackSeqIndex));
 				}
